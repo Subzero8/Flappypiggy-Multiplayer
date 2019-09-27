@@ -1,0 +1,33 @@
+const PIG_HEIGHT = 75;
+const PIG_WIDTH = PIG_HEIGHT * 14 / 9;
+
+const PIPE_HEIGHT = 500;
+const PIPE_WIDTH = 200;
+const PIPE_DISTANCE = 700;
+const GAP_SIZE = PIG_HEIGHT * 4;
+
+const WINDOW_HEIGHT = 900;
+const WINDOW_WIDTH = 1600;
+
+const GRAVITY = 90;
+const PIG_SPEED = -18;
+
+const SERVER_TICKRATE = 60;
+const CLIENT_TICKRATE = 60;
+const FRAME_TIME = 1 / SERVER_TICKRATE;
+
+module.exports = {
+    PIG_HEIGHT,
+    PIG_WIDTH,
+    PIG_SPEED,
+    PIPE_HEIGHT,
+    PIPE_WIDTH,
+    GAP_SIZE,
+    WINDOW_HEIGHT,
+    WINDOW_WIDTH,
+    GRAVITY,
+    SERVER_TICKRATE,
+    CLIENT_TICKRATE,
+    FRAME_TIME,
+    PIPE_DISTANCE
+}
