@@ -1,11 +1,11 @@
-const {PIG_HEIGHT} = require('./constants');
-const {PIG_WIDTH} = require('./constants');
-const {WINDOW_HEIGHT} = require('./constants');
-const {WINDOW_WIDTH} = require('./constants');
+const {PIG_HEIGHT} = require('./Constants');
+const {PIG_WIDTH} = require('./Constants');
+const {WINDOW_HEIGHT} = require('./Constants');
+const {WINDOW_WIDTH} = require('./Constants');
 
-const {GRAVITY} = require('./constants');
-const {SERVER_TICKRATE} = require('./constants');
-const {FRAME_TIME} = require('./constants');
+const {GRAVITY} = require('./Constants');
+const {SERVER_TICKRATE} = require('./Constants');
+const {FRAME_TIME} = require('./Constants');
 
 class Pig {
     constructor() {
@@ -15,7 +15,7 @@ class Pig {
         this.x = WINDOW_WIDTH * 0.2;
         this.vy = 0;
         this.vx = 0;
-        
+
     }
     update(delta) {
         this.y += this.vy * delta / FRAME_TIME;

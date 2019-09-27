@@ -1,6 +1,6 @@
 const ServerPipe = require('./ServerPipe');
 const PIPE_DISTANCE = require('./Constants').PIPE_DISTANCE
-const WINDOW_WIDTH = require('./constants').WINDOW_WIDTH;
+const WINDOW_WIDTH = require('./Constants').WINDOW_WIDTH;
 
 class PipeManager {
     constructor(match) {
