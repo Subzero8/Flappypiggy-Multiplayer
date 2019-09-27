@@ -3,7 +3,7 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const Match = require('./js/server/Match.js');
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 let sockets = [];
 let availableSockets = [];
