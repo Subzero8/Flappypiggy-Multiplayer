@@ -5,14 +5,14 @@ const gameloop = require('node-gameloop');
 
 const {
     SERVER_TICKRATE
-} = require('./constants');
+} = require('./Constants');
 const {
     PIG_SPEED
-} = require('./constants');
+} = require('./Constants');
 
 const {
     WINDOW_HEIGHT
-} = require('./constants');
+} = require('./Constants');
 
 
 class Match {
