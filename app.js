@@ -2,14 +2,14 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
-const Match = require('./js/server/Match.js');
+const Match = require('./src/js/server/Match.js');
 const port = process.env.PORT || 3000;
 
 let sockets = [];
 let availableSockets = [];
 let matches = [];
 
-app.get('/', (req, res) => res.sendFile(__dirname + '/index.html'));
+app.get('/', (req, res) => res.sendFile(__dirname + '/src/index.html'));
 
 app.use(express.static('src'));
 
