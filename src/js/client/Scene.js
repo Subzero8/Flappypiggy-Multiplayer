@@ -34,8 +34,7 @@ class Scene {
             if (pipeSprite) {
                 pipeSprite.position.x = pipe.x;
                 this.adjustPosition(pipeSprite);
-            }
-            else {
+            } else {
                 this.addPipeSprite(pipe)
             }
         })
@@ -141,6 +140,9 @@ class Scene {
         space.press = () => {
             this.socket.emit('spacebar');
         };
+        window.addEventListener('touchstart', () => {
+            this.socket.emit('spacebar');
+        });
     }
 
     keyboard(value) {
@@ -169,6 +171,7 @@ class Scene {
                 event.preventDefault();
             }
         };
+
 
         //Attach event listeners
         const downListener = key.downHandler.bind(key);

@@ -94,7 +94,7 @@ class Match {
         this.notifyObservers(delta);
         this.updatePlayers(delta)
         this.updatePipes(delta)
-        this.checkCollision();
+        //this.checkCollision();
     }
 
     stopLoop() {
@@ -168,11 +168,7 @@ class Match {
             width: 0.7 * player.pig.width,
             height: 0.7 * player.pig.height
         }
-        if (pigHitbox.y + pigHitbox.height <= WINDOW_HEIGHT) {
-            return false;
-        } else {
-            return true;
-        }
+        return pigHitbox.y + pigHitbox.height > WINDOW_HEIGHT
     }
 
 
