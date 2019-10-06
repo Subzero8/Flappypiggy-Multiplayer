@@ -140,6 +140,7 @@ class Scene {
         space.press = () => {
             this.socket.emit('spacebar');
         };
+        
         window.addEventListener('touchstart', () => {
             this.socket.emit('spacebar');
         });
