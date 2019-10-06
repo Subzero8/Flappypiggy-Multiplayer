@@ -137,10 +137,7 @@ class Match {
             width: 0.7 * pig.width,
             height: 0.7 * pig.height
         }
-        if (this.rectanglesIntersects(pigHitbox, pipe)) {
-            return true;
-        }
-        return false;
+        return this.rectanglesIntersects(pigHitbox, pipe)
     }
 
     rectanglesIntersects(pigHitbox, pipe) {
@@ -149,7 +146,6 @@ class Match {
             pigHitbox.x < pipe.x + pipe.width &&
             pigHitbox.y + pigHitbox.height > pipe.topY &&
             pigHitbox.y < pipe.topY + pipe.height) {
-            console.log('top part');
             return true;
         }
         //bottom
@@ -179,9 +175,9 @@ class Match {
         for (let i = this.pipes.length - 1; i >= 0; i--) {
             let pipe = this.pipes[i];
             pipe.update(delta);
-            // if (pipe.x + pipe.width < 0) {
-            //     this.pipes = this.pipes.filter(p => p.number!= pipe.number);
-            // }
+            if (pipe.x + pipe.width < 0) {
+                this.pipes.shift();
+            }
         }
     }
 

@@ -5,21 +5,20 @@ const WINDOW_WIDTH = require('./Constants').WINDOW_WIDTH;
 class PipeManager {
     constructor(match) {
         this.match = match;
-        this.pipes = this.match.pipes;
         this.lastPipe;
     }
 
     notify(currentTime, delta) {
-        this.addPipe(delta);
+        if (this.distanceLastPipe() >= PIPE_DISTANCE) {
+            this.addPipe(delta);
+        }
 
     }
     addPipe(delta) {
-        if (this.distanceLastPipe() >= PIPE_DISTANCE) {
-            let pipe = new ServerPipe(this.match.pipeCounter);
-            this.match.pipeCounter++;
-            this.pipes.push(pipe);
-            this.lastPipe = pipe;
-        }
+        let pipe = new ServerPipe(this.match.pipeCounter);
+        this.match.pipeCounter++;
+        this.match.pipes.push(pipe);
+        this.lastPipe = pipe;
 
     }
     distanceLastPipe() {

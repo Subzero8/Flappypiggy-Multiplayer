@@ -3,7 +3,7 @@ class Scene {
         this.socket = socket;
         this.app = app;
         this.pigs = {};
-        this.pipes = [];
+        this.pipeSprites = [];
         //Config .on from server
         this.socket.on('id', i => id = i)
         this.socket.on('newMatch', state => {
@@ -30,7 +30,7 @@ class Scene {
             this.adjustPosition(clientPig);
         })
         state.pipes.forEach(pipe => {
-            let pipeSprite = this.pipes.find(pipeSprite => pipeSprite.pipe.number == pipe.number);
+            let pipeSprite = this.pipeSprites.find(pipeSprite => pipeSprite.number == pipe.number);
             if (pipeSprite) {
                 pipeSprite.position.x = pipe.x;
                 this.adjustPosition(pipeSprite);
@@ -38,13 +38,19 @@ class Scene {
                 this.addPipeSprite(pipe)
             }
         })
+        this.pipeSprites.forEach(pipeSprite => {
+            if (!state.pipes.some(pipe => pipe.number == pipeSprite.number)) {
+                this.app.stage.removeChild(pipeSprite);
+            }
+        })
+        this.pipeSprites = this.pipeSprites.filter(pipeSprite => state.pipes.some(pipe => pipe.number == pipeSprite.number))
+
     }
     addPipeSprite(pipe) {
-        console.log('addPipeSprite');
         let pipeSprite = new PipeSprite(pipe);
         this.adjustPosition(pipeSprite);
         this.adjustScale(pipeSprite);
-        this.pipes.push(pipeSprite);
+        this.pipeSprites.push(pipeSprite);
         this.app.stage.addChild(pipeSprite);
         // this.app.stage.removeChild(this.score);
         // this.app.stage.addChild(this.score);
@@ -79,11 +85,11 @@ class Scene {
     }
 
     new() {
-        for (let i = 0; i < this.pipes.length; i++) {
-            let pipe = this.pipes[i];
+        for (let i = 0; i < this.pipeSprites.length; i++) {
+            let pipe = this.pipeSprites[i];
             this.app.stage.removeChild(pipe);
         }
-        this.pipes = [];
+        this.pipeSprites = [];
         this.pipeCounter = 0;
         this.score.text = "Score : " + this.pipeCounter;
         this.setPigs();
@@ -140,7 +146,7 @@ class Scene {
         space.press = () => {
             this.socket.emit('spacebar');
         };
-        
+
         window.addEventListener('touchstart', () => {
             this.socket.emit('spacebar');
         });
