@@ -144,11 +144,11 @@ class Scene {
     setListeners() {
         let space = this.keyboard(' ');
         space.press = () => {
-            this.socket.emit('spacebar');
+            this.socket.emit('input', 'spacebar');
         };
 
         window.addEventListener('touchstart', () => {
-            this.socket.emit('spacebar');
+            this.socket.emit('input', 'spacebar');
         });
     }
 

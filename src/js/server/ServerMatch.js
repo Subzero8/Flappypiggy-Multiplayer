@@ -15,15 +15,17 @@ const {
 } = require('./Constants');
 
 
-class Match {
+class ServerMatch {
     constructor(socket1, socket2) {
-        console.log('[New Match] -> ' + socket1.id + ' vs ' + socket2.id);
-        this.socket1 = socket1
-        this.socket2 = socket2
-        this.sockets = [socket1, socket2];
+        //Players
         this.player1 = new ServerPlayer(socket1)
         this.player2 = new ServerPlayer(socket2)
         this.players = [this.player1, this.player2]
+        this.sockets = [socket1, socket2]
+        this.sockets[socket1.id] = socket1
+        this.sockets[socket2.id] = socket2
+        console.log('[New Match] -> ' + this.player1.id + ' vs ' + this.player2.id);
+
         this.pipes = [];
         this.pipeCounter = 0;
 
@@ -31,58 +33,81 @@ class Match {
             pipes: this.pipes,
             players: this.players
         }
-        this.sendNewMatchNotification()
-        this.socket1.on('spacebar', () => {
-            this.input(this.player1);
+        //Inputs
+        this.inputs = []
+        this.getSocket(this.player1.id).on('input', input => {
+            this.inputs.push({
+                player: this.player1,
+                input: input
+            });
         })
-        this.socket2.on('spacebar', () => {
-            this.input(this.player2);
+        this.getSocket(this.player2.id).on('input', input => {
+            this.inputs.push({
+                player: this.player2,
+                input: input
+            });
         })
         this.loop;
         this.currentTime;
         this.observers = [];
+
         this.running = false;
-        this.ended = false;
+        this.matchStarted = false;
+        this.countdownStarted = false;
+        this.sendNewMatchNotification()
+        this.startLoop()
+
+        // this.ended = false;
     }
+
+    getSocket(id) {
+        return this.sockets.find(socket => socket.id == id);
+    }
+
     notifyObservers(delta) {
         this.observers.forEach(observer => observer.notify(this.currentTime, delta))
     }
 
     sendNewMatchNotification() {
-        this.socket1.emit('newMatch', this.state);
-        this.socket2.emit('newMatch', this.state);
+        this.getSocket(this.player1.id).emit('newMatch', this.state);
+        this.getSocket(this.player2.id).emit('newMatch', this.state);
     }
 
-    input(player) {
-        if (!this.running) {
-
-            this.socket1.emit('countdown', 3);
-            this.socket2.emit('countdown', 3);
-            setTimeout(() => {
-                this.socket1.emit('countdown', 2);
-                this.socket2.emit('countdown', 2);
-            }, 1000)
-            setTimeout(() => {
-                this.socket1.emit('countdown', 1);
-                this.socket2.emit('countdown', 1);
-            }, 2000)
-            setTimeout(() => {
-                this.socket1.emit('countdown', 'Go !');
-                this.socket2.emit('countdown', 'Go !');
-                this.startLoop();
-                this.players.forEach(p => p.pig.vy = PIG_SPEED);
-            }, 3000)
-        }
-        player.pig.vy = PIG_SPEED;
+    startCountdown() {
+        this.countdownStarted = true;
+        this.getSocket(this.player1.id).emit('countdown', 3);
+        this.getSocket(this.player2.id).emit('countdown', 3);
+        setTimeout(() => {
+            this.getSocket(this.player1.id).emit('countdown', 2);
+            this.getSocket(this.player2.id).emit('countdown', 2);
+        }, 1000)
+        setTimeout(() => {
+            this.getSocket(this.player1.id).emit('countdown', 1);
+            this.getSocket(this.player2.id).emit('countdown', 1);
+        }, 2000)
+        setTimeout(() => {
+            this.getSocket(this.player1.id).emit('countdown', 'Go !');
+            this.getSocket(this.player2.id).emit('countdown', 'Go !');
+            this.players.forEach(player => player.pig.vy = PIG_SPEED);
+            this.matchStarted = true;
+        }, 3000)
     }
 
     startLoop() {
         this.addObserver(new PipeManager(this));
         this.addObserver(new ClientManager(this));
+
         this.running = true;
         this.loop = gameloop.setGameLoop(delta => {
             this.currentTime = Date.now();
-            this.updateGame(delta);
+            if (this.running) {
+                if (this.matchStarted) {
+                    this.updateGame(delta);
+                }
+                this.handleInputs();
+                this.notifyObservers(delta);
+            }
+
         }, 1000 / SERVER_TICKRATE);
     }
 
@@ -91,10 +116,26 @@ class Match {
     }
 
     updateGame(delta) {
-        this.notifyObservers(delta);
         this.updatePlayers(delta)
         this.updatePipes(delta)
         //this.checkCollision();
+    }
+
+    handleInputs() {
+        if (!this.countdownStarted && this.inputs.length > 0) {
+            this.startCountdown();
+        } else {
+            this.inputs.forEach(input => {
+                let player = this.getPlayer(input.player.id);
+                console.log(player.id, input.input);
+                player.pig.vy = PIG_SPEED
+
+            })
+            this.inputs = [];
+        }
+    }
+    getPlayer(id) {
+        return this.players.find(player => player.id == id);
     }
 
     stopLoop() {
@@ -103,20 +144,20 @@ class Match {
 
     //updates pig positions
     updatePlayers(delta) {
-        this.players.forEach(player => player.pig.update(delta))
+        this.players.forEach(player => player.update(delta))
     }
 
     checkCollision() {
-        let p;
+        let loser;
         this.players.forEach(player => {
             if (this.pigOutOfBounds(player) || this.checkCollisionPipes(player)) {
-                p = player;
+                loser = player;
             }
         })
-        if (p) {
+        if (loser) {
             console.log('game over');
-            this.sockets.find(s => s.id == p.id).emit('lost');
-            this.sockets.find(s => s.id != p.id).emit('won');
+            loser.socket.emit('lost');
+            this.player.socket.find(player => player.socket.id != loser.socket.id).emit('won');
             gameloop.clearGameLoop(this.loop);
         }
     }
@@ -183,4 +224,4 @@ class Match {
 
 }
 
-module.exports = Match
+module.exports = ServerMatch

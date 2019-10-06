@@ -1,4 +1,6 @@
-const {CLIENT_TICKRATE}= require('./Constants');
+const {
+    CLIENT_TICKRATE
+} = require('./Constants');
 
 class ClientManager {
     constructor(match) {
@@ -6,14 +8,16 @@ class ClientManager {
         this.lastTickTime = Date.now();
     }
 
-    notify(currentTime, delta){
+    notify(currentTime, delta) {
         this.sendState(currentTime);
 
     }
 
     sendState(currentTime) {
-        if (currentTime - this.lastTickTime >= 1000/CLIENT_TICKRATE) {
-            this.match.sockets.forEach(s => s.emit('updateState', this.match.state))
+        if (currentTime - this.lastTickTime >= 1000 / CLIENT_TICKRATE) {
+            this.match.sockets.forEach(socket => {
+                socket.emit('updateState', this.match.state);
+            })
             this.lastTickTime = currentTime;
         }
     }

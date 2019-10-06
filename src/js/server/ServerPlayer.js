@@ -5,5 +5,8 @@ class ServerPlayer {
         this.pig = new ServerPig();
         this.id = socket.id;
     }
+    update(delta){
+        this.pig.update(delta);
+    }
 }
 module.exports = ServerPlayer
