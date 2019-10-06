@@ -1,9 +1,9 @@
 const ServerPig = require('./ServerPig')
 
 class ServerPlayer {
-    constructor(socket) {
+    constructor(number) {
         this.pig = new ServerPig();
-        this.id = socket.id;
+        this.number = number;
     }
     update(delta){
         this.pig.update(delta);

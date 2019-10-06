@@ -1,6 +1,8 @@
 const ServerPlayer = require('./ServerPlayer')
 const PipeManager = require('./PipeManager');
 const ClientManager = require('./ClientManager');
+const ServerInput = require('./ServerInput');
+
 const gameloop = require('node-gameloop');
 
 const {
@@ -16,15 +18,17 @@ const {
 
 
 class ServerMatch {
-    constructor(socket1, socket2) {
+    constructor(sockets) {
         //Players
-        this.player1 = new ServerPlayer(socket1)
-        this.player2 = new ServerPlayer(socket2)
-        this.players = [this.player1, this.player2]
-        this.sockets = [socket1, socket2]
-        this.sockets[socket1.id] = socket1
-        this.sockets[socket2.id] = socket2
-        console.log('[New Match] -> ' + this.player1.id + ' vs ' + this.player2.id);
+        this.players = []
+        this.sockets = []
+        for (var i = 0; i < sockets.length; i++) {
+            let player = new ServerPlayer(i);
+            this.players.push(player)
+            this.sockets[player.number] = sockets[player.number]
+            this.getSocket(player.number).emit('playerNumber', player.number);
+        }
+        console.log('[New Match] -> ' + this.sockets.length + ' players.');
 
         this.pipes = [];
         this.pipeCounter = 0;
@@ -35,17 +39,10 @@ class ServerMatch {
         }
         //Inputs
         this.inputs = []
-        this.getSocket(this.player1.id).on('input', input => {
-            this.inputs.push({
-                player: this.player1,
-                input: input
-            });
-        })
-        this.getSocket(this.player2.id).on('input', input => {
-            this.inputs.push({
-                player: this.player2,
-                input: input
-            });
+        this.players.forEach(player => {
+            this.getSocket(player.number).on('input', input => {
+                this.inputs.push(new ServerInput(player.number, input));
+            })
         })
         this.loop;
         this.currentTime;
@@ -60,8 +57,8 @@ class ServerMatch {
         // this.ended = false;
     }
 
-    getSocket(id) {
-        return this.sockets.find(socket => socket.id == id);
+    getSocket(number) {
+        return this.sockets[number];
     }
 
     notifyObservers(delta) {
@@ -69,25 +66,30 @@ class ServerMatch {
     }
 
     sendNewMatchNotification() {
-        this.getSocket(this.player1.id).emit('newMatch', this.state);
-        this.getSocket(this.player2.id).emit('newMatch', this.state);
+        this.players.forEach(player => {
+            this.getSocket(player.number).emit('newMatch', this.state);
+        })
     }
 
     startCountdown() {
         this.countdownStarted = true;
-        this.getSocket(this.player1.id).emit('countdown', 3);
-        this.getSocket(this.player2.id).emit('countdown', 3);
+        this.players.forEach(player => {
+            this.getSocket(player.number).emit('countdown', 3);
+        })
         setTimeout(() => {
-            this.getSocket(this.player1.id).emit('countdown', 2);
-            this.getSocket(this.player2.id).emit('countdown', 2);
+            this.players.forEach(player => {
+                this.getSocket(player.number).emit('countdown', 2);
+            })
         }, 1000)
         setTimeout(() => {
-            this.getSocket(this.player1.id).emit('countdown', 1);
-            this.getSocket(this.player2.id).emit('countdown', 1);
+            this.players.forEach(player => {
+                this.getSocket(player.number).emit('countdown', 1);
+            })
         }, 2000)
         setTimeout(() => {
-            this.getSocket(this.player1.id).emit('countdown', 'Go !');
-            this.getSocket(this.player2.id).emit('countdown', 'Go !');
+            this.players.forEach(player => {
+                this.getSocket(player.number).emit('countdown', 'Go !');
+            })
             this.players.forEach(player => player.pig.vy = PIG_SPEED);
             this.matchStarted = true;
         }, 3000)
@@ -126,16 +128,16 @@ class ServerMatch {
             this.startCountdown();
         } else {
             this.inputs.forEach(input => {
-                let player = this.getPlayer(input.player.id);
-                console.log(player.id, input.input);
-                player.pig.vy = PIG_SPEED
+                let player = this.getPlayer(input.playerNumber);
+                console.log(player.number, input.data);
+                player.pig.vy = PIG_SPEED;
 
             })
             this.inputs = [];
         }
     }
-    getPlayer(id) {
-        return this.players.find(player => player.id == id);
+    getPlayer(number) {
+        return this.players.find(player => player.number == number);
     }
 
     stopLoop() {

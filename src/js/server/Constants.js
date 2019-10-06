@@ -13,7 +13,7 @@ const GRAVITY = 90;
 const PIG_SPEED = -18;
 
 const SERVER_TICKRATE = 60;
-const CLIENT_TICKRATE = 20;
+const CLIENT_TICKRATE = 60;
 const FRAME_TIME = 1 / SERVER_TICKRATE;
 
 module.exports = {

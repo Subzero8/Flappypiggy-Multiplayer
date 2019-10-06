@@ -1,8 +1,8 @@
 class PigSprite extends Container {
-    constructor(pig, id) {
+    constructor(pig, number) {
         super();
         this.pig = pig;
-        this.id = id;
+        this.number = number;
         this.x = pig.x;
         this.y = pig.y;
         this.texture = new Sprite(textures.pig.texture);
@@ -14,11 +14,11 @@ class PigSprite extends Container {
             fontSize: 20,
             fill: "white",
         });
-        this.playerId = new PIXI.Text(this.id, style);
-        this.playerId.y = -50
-
+        this.playerNumber = new PIXI.Text('PLAYER ' + (this.number + 1), style);
+        this.playerNumber.y = -50
+        this.playerNumber.x = (this.pig.width - this.playerNumber.width)/2
         this.addChild(this.texture);
-        this.addChild(this.playerId);
+        this.addChild(this.playerNumber);
 
     }
 

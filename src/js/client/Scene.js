@@ -5,7 +5,7 @@ class Scene {
         this.pigs = {};
         this.pipeSprites = [];
         //Config .on from server
-        this.socket.on('id', i => id = i)
+        this.socket.on('playerNumber', number => playerNumber = number)
         this.socket.on('newMatch', state => {
             console.log("[Server] -> newMatch");
             scene.state = state;
@@ -25,7 +25,7 @@ class Scene {
 
     updateStateFromServer(state) {
         state.players.forEach(player => {
-            let clientPig = this.pigs[player.id];
+            let clientPig = this.pigs[player.number];
             clientPig.position.set(player.pig.x, player.pig.y);
             this.adjustPosition(clientPig);
         })
@@ -69,12 +69,12 @@ class Scene {
     }
     setPigs() {
         this.state.players.forEach(player => {
-            let pigSprite = new PigSprite(player.pig, player.id);
-            this.pigs[player.id] = pigSprite;
+            let pigSprite = new PigSprite(player.pig, player.number);
+            this.pigs[player.number] = pigSprite;
             this.app.stage.addChild(pigSprite);
             this.adjustPosition(pigSprite);
             this.adjustScale(pigSprite);
-            if (pigSprite.id !== id) {
+            if (pigSprite.number !== playerNumber) {
                 pigSprite.alpha = 0.5
             }
         })

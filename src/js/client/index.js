@@ -2,8 +2,8 @@ const HEIGHT = 900;
 const WIDTH = 1600;
 
 
-let id;
-let opponentId;
+let playerNumber;
+let opponentNumber;
 
 let scene;
 let textures;
@@ -42,5 +42,5 @@ loader.onComplete.add(() => {
     console.log('[Loader] -> Complete');
     let socket = io();
     scene = new Scene(app, socket);
-    
+
 });

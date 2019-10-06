@@ -19,13 +19,13 @@ io.on('connection', connectionHandler);
 function connectionHandler(socket) {
     console.log('[Connected] -> ' + socket.id);
     sockets.push(socket);
-    socket.emit('id', socket.id)
     if (notEmpty(availableSockets)) {
-        let opponent = availableSockets.pop();
-        printAvailableSocket(opponent);
-        let match = new Match(socket, opponent)
+        let opponentSocket = availableSockets.pop();
+        // printAvailableSocket(opponentSocket);
+        let sockets = [socket, opponentSocket]
+        let match = new Match(sockets)
         matches[socket.id] = match;
-        matches[opponent.id] = match;
+        matches[opponentSocket.id] = match;
 
     } else {
         availableSockets.push(socket);
