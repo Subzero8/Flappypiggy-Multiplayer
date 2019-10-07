@@ -1,8 +1,8 @@
-class ServerInput {
+class ServerPacket {
     constructor(playerNumber, data) {
         this.playerNumber = playerNumber;
         this.data = data;
     }
 }
 
-module.exports = ServerInput;
+module.exports = ServerPacket;

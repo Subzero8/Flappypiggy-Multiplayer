@@ -1,6 +1,6 @@
 const ServerPipe = require('./ServerPipe');
 const PIPE_DISTANCE = require('./Constants').PIPE_DISTANCE
-const WINDOW_WIDTH = require('./Constants').WINDOW_WIDTH;
+const GAME_WIDTH = require('./Constants').GAME_WIDTH;
 
 class PipeManager {
     constructor(match) {
@@ -23,9 +23,9 @@ class PipeManager {
     }
     distanceLastPipe() {
         if (this.lastPipe) {
-            return WINDOW_WIDTH - this.lastPipe.x;
+            return GAME_WIDTH - this.lastPipe.x;
         }
-        return WINDOW_WIDTH;
+        return GAME_WIDTH;
     }
 
 

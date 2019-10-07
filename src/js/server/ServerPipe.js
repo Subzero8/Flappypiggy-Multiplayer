@@ -1,15 +1,15 @@
 const {PIG_HEIGHT} = require('./Constants');
 const {PIPE_HEIGHT} = require('./Constants');
 const {PIPE_WIDTH} = require('./Constants');
-const {WINDOW_HEIGHT} = require('./Constants');
-const {WINDOW_WIDTH} = require('./Constants');
+const {GAME_HEIGHT} = require('./Constants');
+const {GAME_WIDTH} = require('./Constants');
 const {FRAME_TIME} = require('./Constants');
 const {GAP_SIZE} = require('./Constants');
 
 class ServerPipe {
     constructor(pipeNumber) {
         this.vx = -10;
-        this.x = WINDOW_WIDTH;
+        this.x = GAME_WIDTH;
         this.width = PIPE_WIDTH;
         this.height = PIPE_HEIGHT;
 

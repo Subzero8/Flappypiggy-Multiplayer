@@ -13,21 +13,5 @@ const GRAVITY = 90;
 const PIG_SPEED = -18;
 
 const SERVER_TICKRATE = 60;
-const CLIENT_TICKRATE = 60;
+const UPDATE_RATE = 60;
 const FRAME_TIME = 1 / SERVER_TICKRATE;
-
-module.exports = {
-    PIG_HEIGHT,
-    PIG_WIDTH,
-    PIG_SPEED,
-    PIPE_HEIGHT,
-    PIPE_WIDTH,
-    GAP_SIZE,
-    GAME_HEIGHT,
-    GAME_WIDTH,
-    GRAVITY,
-    SERVER_TICKRATE,
-    CLIENT_TICKRATE,
-    FRAME_TIME,
-    PIPE_DISTANCE
-}

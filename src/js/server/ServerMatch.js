@@ -1,7 +1,7 @@
 const ServerPlayer = require('./ServerPlayer')
 const PipeManager = require('./PipeManager');
 const ClientManager = require('./ClientManager');
-const ServerInput = require('./ServerInput');
+const ServerPacket = require('./ServerInput');
 
 const gameloop = require('node-gameloop');
 
@@ -13,7 +13,7 @@ const {
 } = require('./Constants');
 
 const {
-    WINDOW_HEIGHT
+    GAME_HEIGHT
 } = require('./Constants');
 
 
@@ -38,10 +38,10 @@ class ServerMatch {
             players: this.players
         }
         //Inputs
-        this.inputs = []
+        this.packets = []
         this.players.forEach(player => {
-            this.getSocket(player.number).on('input', input => {
-                this.inputs.push(new ServerInput(player.number, input));
+            this.getSocket(player.number).on('packet', packet => {
+                this.packets.push(new ServerPacket(player.number, packet.data));
             })
         })
         this.loop;
@@ -124,16 +124,23 @@ class ServerMatch {
     }
 
     handleInputs() {
-        if (!this.countdownStarted && this.inputs.length > 0) {
+        if (!this.countdownStarted && this.packets.length > 0) {
             this.startCountdown();
         } else {
-            this.inputs.forEach(input => {
-                let player = this.getPlayer(input.playerNumber);
-                console.log(player.number, input.data);
-                player.pig.vy = PIG_SPEED;
+            this.packets.forEach(packet => {
+                let player = this.getPlayer(packet.playerNumber);
+                console.log(player.number, packet.data);
+                packet.data.forEach(d => {
+                    switch (d) {
+                        case 'spacebar':
+                            player.pig.vy = PIG_SPEED;
+                            break;
+                        default:
 
+                    }
+                })
             })
-            this.inputs = [];
+            this.packets = [];
         }
     }
     getPlayer(number) {
@@ -207,7 +214,7 @@ class ServerMatch {
             width: 0.7 * player.pig.width,
             height: 0.7 * player.pig.height
         }
-        return pigHitbox.y + pigHitbox.height > WINDOW_HEIGHT
+        return pigHitbox.y + pigHitbox.height > GAME_HEIGHT
     }
 
 
