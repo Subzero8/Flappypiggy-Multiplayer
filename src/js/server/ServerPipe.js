@@ -3,12 +3,14 @@ const {PIPE_HEIGHT} = require('./Constants');
 const {PIPE_WIDTH} = require('./Constants');
 const {GAME_HEIGHT} = require('./Constants');
 const {GAME_WIDTH} = require('./Constants');
-const {FRAME_TIME} = require('./Constants');
+const {SERVER_TICK_DURATION} = require('./Constants');
+const {SERVER_TICKRATE} = require('./Constants');
 const {GAP_SIZE} = require('./Constants');
+const {PIPE_SPEED} = require('./Constants');
 
 class ServerPipe {
     constructor(pipeNumber) {
-        this.vx = -10;
+        this.vx = PIPE_SPEED;
         this.x = GAME_WIDTH;
         this.width = PIPE_WIDTH;
         this.height = PIPE_HEIGHT;
@@ -25,7 +27,7 @@ class ServerPipe {
     }
 
     update(delta){
-        let adjustedVelocity = this.vx * (delta / FRAME_TIME);
+        let adjustedVelocity = this.vx * (delta / SERVER_TICK_DURATION) / SERVER_TICKRATE;
         this.x += adjustedVelocity;
     }
 }

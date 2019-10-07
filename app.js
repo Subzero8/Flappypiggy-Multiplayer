@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
-const Match = require('./src/js/server/ServerMatch.js');
+const ServerMatch = require('./src/js/server/ServerMatch.js');
 const port = process.env.PORT || 3000;
 
 let sockets = [];
@@ -23,7 +23,7 @@ function connectionHandler(socket) {
         let opponentSocket = availableSockets.pop();
         // printAvailableSocket(opponentSocket);
         let sockets = [socket, opponentSocket]
-        let match = new Match(sockets)
+        let match = new ServerMatch(sockets)
         matches[socket.id] = match;
         matches[opponentSocket.id] = match;
 

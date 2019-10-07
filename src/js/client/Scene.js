@@ -75,7 +75,6 @@ class Scene {
 
     initializePigs(state, playerNumber) {
         state.players.forEach(player => {
-            console.log(player);
             let pigSprite = new PigSprite(player.pig, player.number);
             this.pigSprites[player.number] = pigSprite;
             this.app.stage.addChild(pigSprite);

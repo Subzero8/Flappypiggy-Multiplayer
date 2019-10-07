@@ -5,7 +5,7 @@ const {GAME_WIDTH} = require('./Constants');
 
 const {GRAVITY} = require('./Constants');
 const {SERVER_TICKRATE} = require('./Constants');
-const {FRAME_TIME} = require('./Constants');
+const {SERVER_TICK_DURATION} = require('./Constants');
 
 class Pig {
     constructor() {
@@ -18,11 +18,11 @@ class Pig {
 
     }
     update(delta) {
-        this.y += this.vy * delta / FRAME_TIME;
+        this.y += this.vy * (delta / SERVER_TICK_DURATION) / SERVER_TICKRATE;
         if (this.y >= GAME_HEIGHT) {
             this.y = GAME_HEIGHT
         }
-        this.vy += GRAVITY / SERVER_TICKRATE * delta / FRAME_TIME;
+        this.vy += GRAVITY * (delta / SERVER_TICK_DURATION) / SERVER_TICKRATE;
     }
 }
 

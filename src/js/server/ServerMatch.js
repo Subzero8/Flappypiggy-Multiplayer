@@ -32,10 +32,11 @@ class ServerMatch {
 
         this.pipes = [];
         this.pipeCounter = 0;
-
+        this.serverStep = 0;// for dead reckoning
         this.state = {
             pipes: this.pipes,
-            players: this.players
+            players: this.players,
+            serverStep: this.serverStep
         }
         //Inputs
         this.packets = []
@@ -88,7 +89,7 @@ class ServerMatch {
         }, 2000)
         setTimeout(() => {
             this.players.forEach(player => {
-                this.getSocket(player.number).emit('countdown', 'Go !');
+                this.getSocket(player.number).emit('countdown', 0);
             })
             this.players.forEach(player => player.pig.vy = PIG_SPEED);
             this.matchStarted = true;
@@ -129,7 +130,6 @@ class ServerMatch {
         } else {
             this.packets.forEach(packet => {
                 let player = this.getPlayer(packet.playerNumber);
-                console.log(player.number, packet.data);
                 packet.data.forEach(d => {
                     switch (d) {
                         case 'spacebar':
