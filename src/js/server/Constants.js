@@ -14,7 +14,7 @@ const GRAVITY = 3500;
 const PIG_SPEED = -800;
 //can't change
 const SERVER_TICKRATE = 60;
-const CLIENT_TICKRATE = 60;
+const CLIENT_TICKRATE = 20;
 
 const SERVER_TICK_DURATION = 1 / SERVER_TICKRATE; //in seconds
 
