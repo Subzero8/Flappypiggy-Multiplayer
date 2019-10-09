@@ -29,6 +29,7 @@ class ServerPipe {
     update(delta){
         let adjustedVelocity = this.vx * (delta / SERVER_TICK_DURATION) / SERVER_TICKRATE;
         this.x += adjustedVelocity;
+
     }
 }
 

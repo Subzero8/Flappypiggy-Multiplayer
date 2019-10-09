@@ -10,11 +10,11 @@ const GAP_SIZE = PIG_HEIGHT * 4;
 const GAME_HEIGHT = 900;
 const GAME_WIDTH = 1600;
 
-const GRAVITY = 3000;
+const GRAVITY = 3500;
 const PIG_SPEED = -800;
 //can't change
 const SERVER_TICKRATE = 60;
-const CLIENT_TICKRATE = 20;
+const CLIENT_TICKRATE = 60;
 
 const SERVER_TICK_DURATION = 1 / SERVER_TICKRATE; //in seconds
 

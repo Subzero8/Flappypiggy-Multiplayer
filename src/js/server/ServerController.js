@@ -1,4 +1,4 @@
-const ServerPlayer = require('./ServerPlayer')
+const ServerClient = require('./ServerClient')
 const PipeManager = require('./PipeManager');
 const ClientManager = require('./ClientManager');
 const ServerPacket = require('./ServerInput');
@@ -17,13 +17,13 @@ const {
 } = require('./Constants');
 
 
-class ServerMatch {
+class ServerController {
     constructor(sockets) {
         //Players
         this.players = []
         this.sockets = []
         for (var i = 0; i < sockets.length; i++) {
-            let player = new ServerPlayer(i);
+            let player = new ServerClient(i);
             this.players.push(player)
             this.sockets[player.number] = sockets[player.number]
             this.getSocket(player.number).emit('playerNumber', player.number);
@@ -32,7 +32,6 @@ class ServerMatch {
 
         this.pipes = [];
         this.pipeCounter = 0;
-        this.serverStep = 0;// for dead reckoning
         this.state = {
             pipes: this.pipes,
             players: this.players,
@@ -42,7 +41,7 @@ class ServerMatch {
         this.packets = []
         this.players.forEach(player => {
             this.getSocket(player.number).on('packet', packet => {
-                this.packets.push(new ServerPacket(player.number, packet.data));
+                this.packets.push(new ServerPacket(packet.sequenceNumber, player.number, packet.data));
             })
         })
         this.loop;
@@ -94,6 +93,11 @@ class ServerMatch {
             this.players.forEach(player => player.pig.vy = PIG_SPEED);
             this.matchStarted = true;
         }, 3000)
+        setTimeout(() => {
+            this.players.forEach(player => {
+                this.getSocket(player.number).emit('countdown', -1);
+            })
+        }, 4000)
     }
 
     startLoop() {
@@ -139,6 +143,7 @@ class ServerMatch {
 
                     }
                 })
+                player.lastSequenceNumberProcessed++;
             })
             this.packets = [];
         }
@@ -233,4 +238,4 @@ class ServerMatch {
 
 }
 
-module.exports = ServerMatch
+module.exports = ServerController
