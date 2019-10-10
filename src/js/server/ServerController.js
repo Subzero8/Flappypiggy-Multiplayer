@@ -1,7 +1,8 @@
 const ServerClient = require('./ServerClient')
-const PipeManager = require('./PipeManager');
-const ClientManager = require('./ClientManager');
+const PipeLoopObserver = require('./PipeLoopObserver');
+const ClientUpdateLoopObserver = require('./ClientUpdateLoopObserver');
 const ServerPacket = require('./ServerInput');
+const ServerState = require('./ServerState');
 
 const gameloop = require('node-gameloop');
 
@@ -26,22 +27,21 @@ class ServerController {
             let player = new ServerClient(i);
             this.players.push(player)
             this.sockets[player.number] = sockets[player.number]
-            this.getSocket(player.number).emit('playerNumber', player.number);
+            this.getSocket(player.number).emit('localPlayerNumber', player.number);
         }
         console.log('[New Match] -> ' + this.sockets.length + ' players.');
 
         this.pipes = [];
         this.pipeCounter = 0;
-        this.state = {
-            pipes: this.pipes,
-            players: this.players,
-            serverStep: this.serverStep
-        }
+        this.serverStep = 0;
+        this.state = new ServerState(this.pipes, this.players, this.serverStep);
+
         //Inputs
         this.packets = []
         this.players.forEach(player => {
             this.getSocket(player.number).on('packet', packet => {
-                this.packets.push(new ServerPacket(packet.sequenceNumber, player.number, packet.data));
+                this.packets.push(new ServerPacket(player.number, packet.data));
+                this.handleInputs();
             })
         })
         this.loop;
@@ -54,6 +54,7 @@ class ServerController {
         this.sendNewMatchNotification()
         this.startLoop()
 
+        this.previousState = [];
         // this.ended = false;
     }
 
@@ -62,6 +63,7 @@ class ServerController {
     }
 
     notifyObservers(delta) {
+        this.currentTime = Date.now();
         this.observers.forEach(observer => observer.notify(this.currentTime, delta))
     }
 
@@ -101,17 +103,12 @@ class ServerController {
     }
 
     startLoop() {
-        this.addObserver(new PipeManager(this));
-        this.addObserver(new ClientManager(this));
+        this.addObserver(new PipeLoopObserver(this));
+        this.addObserver(new ClientUpdateLoopObserver(this));
 
-        this.running = true;
         this.loop = gameloop.setGameLoop(delta => {
-            this.currentTime = Date.now();
-            if (this.running) {
-                if (this.matchStarted) {
-                    this.updateGame(delta);
-                }
-                this.handleInputs();
+            if (this.matchStarted) {
+                this.updateGame(delta);
                 this.notifyObservers(delta);
             }
 
@@ -126,6 +123,7 @@ class ServerController {
         this.updatePlayers(delta)
         this.updatePipes(delta)
         //this.checkCollision();
+        this.state.serverStep++;
     }
 
     handleInputs() {
@@ -134,16 +132,16 @@ class ServerController {
         } else {
             this.packets.forEach(packet => {
                 let player = this.getPlayer(packet.playerNumber);
+                console.log(packet);
                 packet.data.forEach(d => {
                     switch (d) {
-                        case 'spacebar':
+                        case 'jump':
                             player.pig.vy = PIG_SPEED;
                             break;
                         default:
 
                     }
                 })
-                player.lastSequenceNumberProcessed++;
             })
             this.packets = [];
         }

@@ -15,6 +15,9 @@ const PIG_SPEED = -800;
 //can't change
 const SERVER_TICKRATE = 60;
 
+const CLIENT_TICKRATE = 20;
+const INTERPOLATION_PERIOD = 1000/CLIENT_TICKRATE * 2;
+
 //client constants
 const UPDATE_TICK_RATE = 60;
 const UPDATE_FRAME_TIME = 1000 / UPDATE_TICK_RATE;//in ms

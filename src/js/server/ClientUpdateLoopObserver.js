@@ -2,7 +2,7 @@ const {
     CLIENT_TICKRATE
 } = require('./Constants');
 
-class ClientManager {
+class ClientUpdateLoopObserver {
     constructor(match) {
         this.match = match;
         this.lastTickTime = Date.now();
@@ -18,8 +18,9 @@ class ClientManager {
             this.match.sockets.forEach(socket => {
                 socket.emit('updateState', this.match.state);
             })
+
             this.lastTickTime = currentTime;
         }
     }
 }
-module.exports = ClientManager;
+module.exports = ClientUpdateLoopObserver;

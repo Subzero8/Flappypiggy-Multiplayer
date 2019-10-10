@@ -1,6 +1,5 @@
 class ServerPacket {
-    constructor(sequenceNumber, playerNumber, data) {
-        this.sequenceNumber = sequenceNumber;
+    constructor(playerNumber, data) {
         this.playerNumber = playerNumber;
         this.data = data;
     }

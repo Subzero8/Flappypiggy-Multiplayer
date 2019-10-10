@@ -2,25 +2,44 @@ class ClientController {
     constructor(scene, socket) {
         this.scene = scene;
         this.socket = socket;
-        this.clientState;
-        this.serverState
-        this.playerNumber;
+        this.localPlayerNumber;
 
+        this.pendingInputs = [];
+
+        this.startTime;
+        this.lastFrame;
+        this.running = false;
+
+        this.statesHistory = [];
+        this.lastState;
+        this.currentState;
+        this.serverState;
+        this.statesHistory = [];
+        this.timeSinceLastServerSnapshot = 0;
+
+        this.initializeNetworking();
+    }
+
+    initializeNetworking() {
         this.socket.on('updateState', serverState => {
             this.serverState = serverState;
-            this.clientState = serverState;
-            //this.correctActorsPosition();
-            this.serverReconciliation();
+            this.correctActorsPosition();
+            this.statesHistory.push(serverState);
+            this.timeSinceLastServerSnapshot = 0;
+            //this.serverReconciliation();
         });
-        this.socket.on('playerNumber', number => this.playerNumber = number)
+        this.socket.on('localPlayerNumber', number => {
+            this.localPlayerNumber = number;
+
+                console.log(number);
+        })
         this.socket.on('newMatch', serverState => {
             console.log("[MATCH FOUND]");
-
-            this.clientState = serverState;
+            this.currentState = serverState;
             this.setListeners();
-            this.scene.initialize(serverState, this.playerNumber);
+            //initialize Scene
+            this.scene.initialize(serverState, this.localPlayerNumber);
             this.scene.displayMessage(this.scene.annoncer, 'Match Found !');
-            this.startLoop();
             this.socket.on('won', () => this.scene.displayMessage(this.scene.annoncer, 'You Won !'));
             this.socket.on('lost', () => this.scene.displayMessage(this.scene.annoncer, 'You Lost !'));
             this.socket.on('countdown', count => {
@@ -36,17 +55,16 @@ class ClientController {
                         this.scene.displayMessage(this.scene.annoncer, count)
 
                 }
-            });
+            })
+            this.startLoop();
         })
-        this.players = [];
-        this.pigs = [];
-        this.pipes = [];
-        this.requestsManager = new RequestsManager(this);
+    }
 
-        this.lag = 0;
-        this.startTime;
-        this.lastFrame;
-        this.running = false;
+    clientSidePrediction(state) {
+        let localPlayer = state.players.find(player => player.number == this.localPlayerNumber)
+        this.pendingInputs.forEach(input => {
+            localPlayer.pig.vy = PIG_SPEED;
+        })
     }
 
     startLoop() {
@@ -67,21 +85,40 @@ class ClientController {
         this.lastFrame = currentFrame;
 
         if (delta >= UPDATE_FRAME_TIME) {
+            this.sendInputsToServer();
             if (this.running) {
+                this.applyInputs()
+                this.scene.updateScene(this.currentState);
+                this.lastState = this.getCopy(this.currentState);
                 this.deadReckoning(delta);
-                this.scene.updateScene(this.clientState);
             }
+            this.timeSinceLastServerSnapshot += delta;
         }
 
         requestAnimationFrame(this.gameLoop.bind(this));
     }
+    applyInputs() {
+        let localPlayer = this.currentState.players.find(player => player.number == this.localPlayerNumber);
+        this.pendingInputs.forEach(input => {
+            localPlayer.pig.vy = PIG_SPEED;
+        })
+    }
+
+    getCopy(object) {
+        return JSON.parse(JSON.stringify(object));
+    }
+
+    sendInputsToServer() {
+        this.sendInputs(this.pendingInputs);
+        this.pendingInputs = [];
+    }
 
     deadReckoning(delta) {
         //predict position of each pipes
-        this.clientState.pipes.forEach(pipe => {
+        this.currentState.pipes.forEach(pipe => {
             pipe.x += (PIPE_SPEED * delta / UPDATE_FRAME_TIME) / UPDATE_TICK_RATE;
         })
-        this.clientState.players.forEach(player => {
+        this.currentState.players.forEach(player => {
             player.pig.y += (player.pig.vy * delta / UPDATE_FRAME_TIME) / UPDATE_TICK_RATE;
             if (player.pig.y >= GAME_HEIGHT) {
                 player.pig.y = GAME_HEIGHT
@@ -94,32 +131,17 @@ class ClientController {
     setListeners() {
         let space = new KeyListener(' ');
         space.press = () => {
-            this.clientSidePrediction('spacebar');
-            this.requestsManager.addInput('spacebar');
-            this.requestsManager.sendInputs();
+            this.pendingInputs.push('jump');
         };
 
         window.addEventListener('touchstart', () => {
-            this.clientSidePrediction('spacebar');
-            this.requestsManager.addInput('spacebar');
-            this.requestsManager.sendInputs();
+            this.pendingInputs.push('jump');
         });
     }
 
-    clientSidePrediction(input) {
-        let player = this.clientState.players.find(p => p.number == this.playerNumber);
-        switch (input) {
-            case 'spacebar':
-                player.pig.vy = PIG_SPEED;
-                break;
-            default:
-
-        }
-    }
-
     serverReconciliation() {
-        let player = this.clientState.players.find(p => p.number == this.playerNumber);
-        let lastSequenceNumberProcessed = player.lastSequenceNumberProcessed;
+        let localPlayer = this.currentState.players.find(p => p.number == this.localPlayerNumber);
+
         this.discardCopy(lastSequenceNumberProcessed);
         this.requestsManager.packetsHistory.forEach(packet => {
             packet.data.forEach(input => clientSidePrediction(input));
@@ -134,33 +156,55 @@ class ClientController {
     }
 
     correctActorsPosition() {
-        let clientStatePipes = [];
-        this.clientState.pipes.forEach(clientPipe => clientStatePipes.push(clientPipe));
+        this.lastState = this.getCopy(this.currentState);
+        this.currentState = this.getCopy(this.serverState);
+        if (this.timeSinceLastServerSnapshot <= INTERPOLATION_PERIOD) {
+            this.currentState.pipes.forEach(pipe => {
+                let lastPipe = this.lastState.pipes.find(p => p.number == pipe.number);
+                let serverPipe = this.currentState.pipes.find(p => p.number == pipe.number);
+                if (lastPipe) {
+                    pipe.x = this.lerp(lastPipe.x, serverPipe.x, this.timeSinceLastServerSnapshot / INTERPOLATION_PERIOD);
+                } else {
+                    pipe.x = serverPipe.x;
+                }
+            })
+            this.currentState.players.forEach(player => {
+                let lastStatePig = this.lastState.players.find(p => p.number == player.number).pig;
+                let serverPig = this.currentState.players.find(p => p.number == player.number).pig;
+                if (lastStatePig) {
+                    player.pig.y = this.lerp(lastStatePig.y, serverPig.y, this.timeSinceLastServerSnapshot / INTERPOLATION_PERIOD);
+                } else {
+                    player.pig.y = serverPig.y;
+                }
+            })
+        } else {
+            console.log(this.timeSinceLastServerSnapshot);
+            this.currentState.pipes.forEach(pipe => {
+                let serverPipe = this.currentState.pipes.find(p => p.number == pipe.number);
+                pipe.x = serverPipe.x
+            })
+            this.currentState.players.forEach(player => {
+                let serverPig = this.currentState.players.find(p => p.number == player.number).pig;
+                player.pig.y = serverPig.y;
 
-        let clientStatePlayers = [];
-        this.clientState.players.forEach(clientPlayer => clientStatePlayers.push(clientPlayer));
+            })
+        }
 
-        this.clientState = this.serverState;
 
-        this.clientState.pipes.forEach(clientPipe => {
-            let oldClientPipe = clientStatePipes.find(p => p.number == clientPipe.number);
+    }
 
-            if (oldClientPipe) {
-                let deltaPosition = clientPipe.x - oldClientPipe.x;
-                clientPipe.x = oldClientPipe.x + deltaPosition * 0.75;
+    sendInputs(inputs) {
+        if (inputs.length > 0) {
+            let packet = {
+                action: 'input',
+                data: inputs
             }
+            this.socket.emit('packet', packet);
+        }
+    }
 
-        })
-        //same for pigs
-        this.clientState.players.forEach(clientPlayer => {
-            let oldClientPlayer = clientStatePlayers.find(p => p.number == clientPlayer.number);
-
-            let deltaPosition = clientPlayer.pig.y - oldClientPlayer.pig.y;
-            if (Math.abs(deltaPosition) <= PIG_DEVIATION_MARGIN) {
-
-                clientPlayer.pig.y = oldClientPlayer.pig.y + deltaPosition * 0.75;
-            }
-        })
+    lerp(start, end, time) {
+        return start * (1 - time) + end * time;
     }
 
 }

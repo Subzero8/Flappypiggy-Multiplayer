@@ -2,7 +2,7 @@ const ServerPipe = require('./ServerPipe');
 const PIPE_DISTANCE = require('./Constants').PIPE_DISTANCE
 const GAME_WIDTH = require('./Constants').GAME_WIDTH;
 
-class PipeManager {
+class PipeLoopObserver {
     constructor(match) {
         this.match = match;
         this.lastPipe;
@@ -31,4 +31,4 @@ class PipeManager {
 
 }
 
-module.exports = PipeManager;
+module.exports = PipeLoopObserver;
