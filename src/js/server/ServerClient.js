@@ -9,4 +9,4 @@ class ServerClient {
         this.pig.update(delta);
     }
 }
-module.exports = ServerClient
+module.exports = ServerClient;

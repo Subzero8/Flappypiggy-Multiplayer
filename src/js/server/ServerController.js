@@ -1,10 +1,11 @@
-const ServerClient = require('./ServerClient')
+const ServerClient = require('./ServerClient');
 const PipeLoopObserver = require('./PipeLoopObserver');
 const ClientUpdateLoopObserver = require('./ClientUpdateLoopObserver');
 const ServerPacket = require('./ServerInput');
 const ServerState = require('./ServerState');
 
 const gameloop = require('node-gameloop');
+const {SERVER_TICK_DURATION} = require("./Constants");
 
 const {
     SERVER_TICKRATE
@@ -21,12 +22,12 @@ const {
 class ServerController {
     constructor(sockets) {
         //Players
-        this.players = []
-        this.sockets = []
-        for (var i = 0; i < sockets.length; i++) {
+        this.players = [];
+        this.sockets = [];
+        for (let i = 0; i < sockets.length; i++) {
             let player = new ServerClient(i);
-            this.players.push(player)
-            this.sockets[player.number] = sockets[player.number]
+            this.players.push(player);
+            this.sockets[player.number] = sockets[player.number];
             this.getSocket(player.number).emit('localPlayerNumber', player.number);
         }
         console.log('[New Match] -> ' + this.sockets.length + ' players.');
@@ -37,13 +38,13 @@ class ServerController {
         this.state = new ServerState(this.pipes, this.players, this.serverStep);
 
         //Inputs
-        this.packets = []
+        this.packets = [];
         this.players.forEach(player => {
             this.getSocket(player.number).on('packet', packet => {
                 this.packets.push(new ServerPacket(player.number, packet.data));
                 this.handleInputs();
             })
-        })
+        });
         this.loop;
         this.currentTime;
         this.observers = [];
@@ -51,11 +52,16 @@ class ServerController {
         this.running = false;
         this.matchStarted = false;
         this.countdownStarted = false;
-        this.sendNewMatchNotification()
-        this.startLoop()
+        this.sendNewMatchNotification();
+        this.startLoop();
 
         this.previousState = [];
         // this.ended = false;
+
+        this.previousTick = Date.now();
+        // number of times gameLoop gets called
+        this.actualTicks = 0;
+
     }
 
     getSocket(number) {
@@ -77,24 +83,24 @@ class ServerController {
         this.countdownStarted = true;
         this.players.forEach(player => {
             this.getSocket(player.number).emit('countdown', 3);
-        })
+        });
         setTimeout(() => {
             this.players.forEach(player => {
                 this.getSocket(player.number).emit('countdown', 2);
             })
-        }, 1000)
+        }, 1000);
         setTimeout(() => {
             this.players.forEach(player => {
                 this.getSocket(player.number).emit('countdown', 1);
             })
-        }, 2000)
+        }, 2000);
         setTimeout(() => {
             this.players.forEach(player => {
                 this.getSocket(player.number).emit('countdown', 0);
-            })
+            });
             this.players.forEach(player => player.pig.vy = PIG_SPEED);
             this.matchStarted = true;
-        }, 3000)
+        }, 3000);
         setTimeout(() => {
             this.players.forEach(player => {
                 this.getSocket(player.number).emit('countdown', -1);
@@ -105,23 +111,36 @@ class ServerController {
     startLoop() {
         this.addObserver(new PipeLoopObserver(this));
         this.addObserver(new ClientUpdateLoopObserver(this));
+        this.gameLoop();
+    }
+    gameLoop () {
+        let now = Date.now();
 
-        this.loop = gameloop.setGameLoop(delta => {
+        this.actualTicks++;
+        if (this.previousTick + SERVER_TICK_DURATION <= now) {
+            let delta = (now - this.previousTick) / 1000;
+            this.previousTick = now;
             if (this.matchStarted) {
-                this.updateGame(delta);
+                this.update(delta);
                 this.notifyObservers(delta);
             }
+            this.actualTicks = 0
+        }
 
-        }, 1000 / SERVER_TICKRATE);
+        if (Date.now() - this.previousTick < SERVER_TICK_DURATION - 16) {
+            setTimeout(() => this.gameLoop());
+        } else {
+            setImmediate(() => this.gameLoop());
+        }
     }
 
     addObserver(observer) {
         this.observers.push(observer);
     }
 
-    updateGame(delta) {
-        this.updatePlayers(delta)
-        this.updatePipes(delta)
+    update(delta) {
+        this.updatePlayers(delta);
+        this.updatePipes(delta);
         //this.checkCollision();
         this.state.serverStep++;
     }
@@ -142,7 +161,7 @@ class ServerController {
 
                     }
                 })
-            })
+            });
             this.packets = [];
         }
     }
@@ -165,7 +184,7 @@ class ServerController {
             if (this.pigOutOfBounds(player) || this.checkCollisionPipes(player)) {
                 loser = player;
             }
-        })
+        });
         if (loser) {
             console.log('game over');
             loser.socket.emit('lost');
@@ -189,7 +208,7 @@ class ServerController {
             y: pig.y + 0.3 * pig.height / 2,
             width: 0.7 * pig.width,
             height: 0.7 * pig.height
-        }
+        };
         return this.rectanglesIntersects(pigHitbox, pipe)
     }
 
@@ -216,7 +235,7 @@ class ServerController {
             y: player.pig.y + 0.3 * player.pig.height / 2,
             width: 0.7 * player.pig.width,
             height: 0.7 * player.pig.height
-        }
+        };
         return pigHitbox.y + pigHitbox.height > GAME_HEIGHT
     }
 
@@ -236,4 +255,4 @@ class ServerController {
 
 }
 
-module.exports = ServerController
+module.exports = ServerController;

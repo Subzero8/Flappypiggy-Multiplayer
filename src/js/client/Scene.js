@@ -4,13 +4,12 @@ class Scene {
         this.pigSprites = [];
         this.pipeSprites = [];
         this.pipeCounter = 0;
-
         this.initializeBackground();
         this.initializeScore();
         this.initializeAnnoncer();
     }
 
-    updateScene(state) {
+    render(state) {
         this.updatePigs(state);
         this.updatePipes(state);
         this.deleteUnusedPipes(state);
@@ -19,16 +18,16 @@ class Scene {
 
     deleteUnusedPipes(state) {
         this.pipeSprites.forEach(pipeSprite => {
-            if (!state.pipes.some(pipe => pipe.number == pipeSprite.number)) {
+            if (!state.pipes.some(pipe => pipe.number === pipeSprite.number)) {
                 this.app.stage.removeChild(pipeSprite);
             }
-        })
-        this.pipeSprites = this.pipeSprites.filter(pipeSprite => state.pipes.some(pipe => pipe.number == pipeSprite.number))
+        });
+        this.pipeSprites = this.pipeSprites.filter(pipeSprite => state.pipes.some(pipe => pipe.number === pipeSprite.number))
     }
 
     updatePipes(state) {
         state.pipes.forEach(pipe => {
-            let pipeSprite = this.pipeSprites.find(pipeSprite => pipeSprite.number == pipe.number);
+            let pipeSprite = this.pipeSprites.find(pipeSprite => pipeSprite.number === pipe.number);
             if (pipeSprite) {
                 pipeSprite.position.x = pipe.x;
                 this.adjustPosition(pipeSprite);
@@ -87,17 +86,17 @@ class Scene {
     }
 
     adjustScale(actor) {
-        actor.width = actor.width * this.app.renderer.width / this.app.renderer.resolution / GAME_WIDTH
+        actor.width = actor.width * this.app.renderer.width / this.app.renderer.resolution / GAME_WIDTH;
         actor.height = actor.height * this.app.renderer.height / this.app.renderer.resolution / GAME_HEIGHT
     }
 
     lose() {
         console.log('lost');
-        this.setAnnoncer('You lost');
+        this.displayMessage(this.annoncer, 'You lost');
     }
     win() {
         console.log('win');
-        this.setAnnoncer('You won');
+        this.displayMessage(this.annoncer,'You won');
     }
 
 
@@ -128,7 +127,7 @@ class Scene {
             fill: "white"
         });
         this.score = new PIXI.Text("Score : 0", style);
-        this.score.position.set(25,25);
+        this.score.position.set(25, 25);
         this.app.stage.addChild(this.score);
     }
 

@@ -24,15 +24,15 @@ class ClientController {
         this.socket.on('updateState', serverState => {
             this.serverState = serverState;
             this.correctActorsPosition();
-            this.statesHistory.push(serverState);
+            //this.statesHistory.push(serverState);
             this.timeSinceLastServerSnapshot = 0;
             //this.serverReconciliation();
         });
         this.socket.on('localPlayerNumber', number => {
             this.localPlayerNumber = number;
 
-                console.log(number);
-        })
+            console.log(number);
+        });
         this.socket.on('newMatch', serverState => {
             console.log("[MATCH FOUND]");
             this.currentState = serverState;
@@ -45,25 +45,18 @@ class ClientController {
             this.socket.on('countdown', count => {
                 switch (count) {
                     case 0:
-                        this.scene.displayMessage(this.scene.annoncer, 'Go !')
+                        this.scene.displayMessage(this.scene.annoncer, 'Go !');
                         this.running = true;
                         break;
                     case -1:
-                        this.scene.displayMessage(this.scene.annoncer, '')
+                        this.scene.displayMessage(this.scene.annoncer, '');
                         break;
                     default:
                         this.scene.displayMessage(this.scene.annoncer, count)
 
                 }
-            })
+            });
             this.startLoop();
-        })
-    }
-
-    clientSidePrediction(state) {
-        let localPlayer = state.players.find(player => player.number == this.localPlayerNumber)
-        this.pendingInputs.forEach(input => {
-            localPlayer.pig.vy = PIG_SPEED;
         })
     }
 
@@ -85,12 +78,12 @@ class ClientController {
         this.lastFrame = currentFrame;
 
         if (delta >= UPDATE_FRAME_TIME) {
-            this.sendInputsToServer();
+            console.log(delta);
+            this.processInput();
             if (this.running) {
-                this.applyInputs()
-                this.scene.updateScene(this.currentState);
+                this.update(delta / 1000);
+                this.render();
                 this.lastState = this.getCopy(this.currentState);
-                this.deadReckoning(delta);
             }
             this.timeSinceLastServerSnapshot += delta;
         }
@@ -98,8 +91,8 @@ class ClientController {
         requestAnimationFrame(this.gameLoop.bind(this));
     }
     applyInputs() {
-        let localPlayer = this.currentState.players.find(player => player.number == this.localPlayerNumber);
-        this.pendingInputs.forEach(input => {
+        let localPlayer = this.currentState.players.find(player => player.number === this.localPlayerNumber);
+        this.pendingInputs.forEach(() => {
             localPlayer.pig.vy = PIG_SPEED;
         })
     }
@@ -113,17 +106,18 @@ class ClientController {
         this.pendingInputs = [];
     }
 
-    deadReckoning(delta) {
+    update(delta) {
         //predict position of each pipes
         this.currentState.pipes.forEach(pipe => {
-            pipe.x += (PIPE_SPEED * delta / UPDATE_FRAME_TIME) / UPDATE_TICK_RATE;
-        })
+            pipe.x += PIPE_SPEED * delta;
+        });
+
         this.currentState.players.forEach(player => {
-            player.pig.y += (player.pig.vy * delta / UPDATE_FRAME_TIME) / UPDATE_TICK_RATE;
+            player.pig.y += player.pig.vy * delta;
             if (player.pig.y >= GAME_HEIGHT) {
                 player.pig.y = GAME_HEIGHT
             }
-            player.pig.vy += (GRAVITY * delta / UPDATE_FRAME_TIME) / UPDATE_TICK_RATE;
+            player.pig.vy += GRAVITY * delta;
         })
     }
 
@@ -140,7 +134,7 @@ class ClientController {
     }
 
     serverReconciliation() {
-        let localPlayer = this.currentState.players.find(p => p.number == this.localPlayerNumber);
+        let localPlayer = this.currentState.players.find(p => p.number === this.localPlayerNumber);
 
         this.discardCopy(lastSequenceNumberProcessed);
         this.requestsManager.packetsHistory.forEach(packet => {
@@ -160,34 +154,33 @@ class ClientController {
         this.currentState = this.getCopy(this.serverState);
         if (this.timeSinceLastServerSnapshot <= INTERPOLATION_PERIOD) {
             this.currentState.pipes.forEach(pipe => {
-                let lastPipe = this.lastState.pipes.find(p => p.number == pipe.number);
-                let serverPipe = this.currentState.pipes.find(p => p.number == pipe.number);
+                let lastPipe = this.lastState.pipes.find(p => p.number === pipe.number);
+                let serverPipe = this.currentState.pipes.find(p => p.number === pipe.number);
                 if (lastPipe) {
                     pipe.x = this.lerp(lastPipe.x, serverPipe.x, this.timeSinceLastServerSnapshot / INTERPOLATION_PERIOD);
                 } else {
                     pipe.x = serverPipe.x;
                 }
-            })
-            this.currentState.players.forEach(player => {
-                let lastStatePig = this.lastState.players.find(p => p.number == player.number).pig;
-                let serverPig = this.currentState.players.find(p => p.number == player.number).pig;
+            });
+            /*this.currentState.players.forEach(player => {
+                let lastStatePig = this.lastState.players.find(p => p.number === player.number).pig;
+                let serverPig = this.currentState.players.find(p => p.number === player.number).pig;
                 if (lastStatePig) {
                     player.pig.y = this.lerp(lastStatePig.y, serverPig.y, this.timeSinceLastServerSnapshot / INTERPOLATION_PERIOD);
                 } else {
                     player.pig.y = serverPig.y;
                 }
-            })
+            })*/
         } else {
-            console.log(this.timeSinceLastServerSnapshot);
             this.currentState.pipes.forEach(pipe => {
-                let serverPipe = this.currentState.pipes.find(p => p.number == pipe.number);
+                let serverPipe = this.currentState.pipes.find(p => p.number === pipe.number);
                 pipe.x = serverPipe.x
             })
-            this.currentState.players.forEach(player => {
-                let serverPig = this.currentState.players.find(p => p.number == player.number).pig;
-                player.pig.y = serverPig.y;
-
-            })
+            // this.currentState.players.forEach(player => {
+            //     let serverPig = this.currentState.players.find(p => p.number == player.number).pig;
+            //     player.pig.y = serverPig.y;
+            //
+            // })
         }
 
 
@@ -198,7 +191,7 @@ class ClientController {
             let packet = {
                 action: 'input',
                 data: inputs
-            }
+            };
             this.socket.emit('packet', packet);
         }
     }
@@ -207,4 +200,12 @@ class ClientController {
         return start * (1 - time) + end * time;
     }
 
+    processInput() {
+        this.sendInputsToServer();
+        this.applyInputs();
+    }
+
+    render() {
+        this.scene.render(this.currentState);
+    }
 }

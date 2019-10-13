@@ -16,7 +16,7 @@ const PIG_SPEED = -800;
 const SERVER_TICKRATE = 60;
 const CLIENT_TICKRATE = 20;
 
-const SERVER_TICK_DURATION = 1 / SERVER_TICKRATE; //in seconds
+const SERVER_TICK_DURATION = 1000 / SERVER_TICKRATE; //in ms
 
 module.exports = {
     PIG_HEIGHT,
