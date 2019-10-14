@@ -237,12 +237,12 @@ class ClientController {
         console.log(this.clientStep - serverStep, ' (', this.clientStep, '-', serverStep, ')');
         // console.log(serverStep - this.clientStep, ' (', serverStep, '-', this.clientStep, ')');
         if (this.inputHistory.length > 0) {
-            console.log('THERE IS INPUT UNPROCESSED !!!');
+            console.log('THERE IS INPUT UNPROCESSED !!! (',this.inputHistory.length,')');
             for (let i = 0; i < this.inputHistory.length; i++) {
                 let nextInputStep = this.inputHistory.shift();
+                console.log('nextInputStep', nextInputStep);
                 for (let j = 0; j < nextInputStep - serverStep; j++) {
                     this.updateGame(newState);
-                    newStep++
                 }
                 this.applyInput(newState);
             }
@@ -250,10 +250,8 @@ class ClientController {
             for (let i = 0; i < this.clientStep - serverStep; i++) {
                 //console.log(i + '. fixing game state');
                 this.updateGame(newState);
-                newStep++;
             }
         }
-        this.clientStep = newStep;
         this.currentState = this.getCopy(newState);
     }
 
