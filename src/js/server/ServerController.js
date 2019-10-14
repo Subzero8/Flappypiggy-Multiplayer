@@ -35,7 +35,6 @@ class ServerController {
         this.players.forEach(player => {
             this.getSocket(player.number).on('packet', packet => {
                 this.packets.push(packet);
-                this.handleInputs();
             });
             this.getSocket(player.number).on('ready', () => {
                 if (!this.countdownStarted) {
@@ -66,9 +65,13 @@ class ServerController {
     }
 
     sendNewMatchNotification() {
+
         this.players.forEach(player => {
-            this.getSocket(player.number).emit('newMatch', this.state);
-        })
+            this.getSocket(player.number).emit('newMatch', {
+                state: this.state,
+                sent: Date.now()
+            });
+        });
     }
 
     startCountdown() {
@@ -108,7 +111,10 @@ class ServerController {
 
     sendUpdates() {
         this.sockets.forEach(socket => {
-            socket.emit('updateState', this.state);
+            socket.emit('updateState', {
+                state: this.state,
+                sent: Date.now()
+            });
         });
     }
 

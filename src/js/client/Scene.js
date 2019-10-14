@@ -7,6 +7,7 @@ class Scene {
         this.initializeBackground();
         this.initializeScore();
         this.initializeAnnoncer();
+        this.initializePingDisplay();
     }
 
     render(state) {
@@ -126,12 +127,29 @@ class Scene {
             fill: "white"
         });
         this.score = new PIXI.Text("Score : 0", style);
-        this.score.position.set(25, 25);
+        this.score.x = window.innerWidth * 0.01;
+        this.score.y = window.innerHeight * 0.01;
         this.app.stage.addChild(this.score);
     }
 
     updateScore() {
         this.pipeCounter++;
         this.displayMessage(this.score, "Score : " + this.pipeCounter)
+    }
+
+    initializePingDisplay() {
+        let style = new PIXI.TextStyle({
+            fontFamily: "Futura",
+            fontSize: 30 * this.app.renderer.width / this.app.renderer.resolution / GAME_WIDTH,
+            fill: "white"
+        });
+        this.ping = new PIXI.Text("Ping : 0", style);
+
+        this.ping.x = window.innerWidth * 0.1;
+        this.ping.y = window.innerHeight * 0.01;
+        this.app.stage.addChild(this.ping);
+    }
+    setPing(value){
+        this.ping.text = "Ping : " + value;
     }
 }

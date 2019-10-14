@@ -10,27 +10,35 @@ class ClientController {
         this.clientStep = 0;
         this.running = false;
 
-
+        //for physics loop
         this.previousPhysics = 0;
         this.lagPhysics = 0;
+        //for ping calculation
+        this.pings = [];
+        this.ping = null;
 
         this.initializeNetworking();
     }
 
     initializeNetworking() {
-        this.socket.on('updateState', serverState => this.onServerUpdate(serverState));
+        this.socket.on('updateState', packet => this.onServerUpdate(packet));
         this.socket.on('localPlayerNumber', number => this.localPlayerNumber = number);
-        this.socket.on('newMatch', serverState => this.onNewMatch(serverState));
+        this.socket.on('newMatch', packet => this.onNewMatch(packet));
     }
 
-    onServerUpdate(serverState) {
-        this.serverState = this.getCopy(serverState);
+    onServerUpdate(packet) {
+        this.serverState = this.getCopy(packet.state);
+        this.pings.push({
+            received: Date.now(),
+            delay: Date.now() - packet.sent
+        });
         this.serverReconciliation();
+        this.scene.setPing(this.calculatePing());
     }
 
-    onNewMatch(serverState) {
+    onNewMatch(packet) {
         console.log("[MATCH FOUND]");
-        this.currentState = this.getCopy(serverState);
+        this.onServerUpdate(packet);
         this.setListeners();
         //initialize Scene
         this.scene.initialize(this.currentState, this.localPlayerNumber);
@@ -248,5 +256,18 @@ class ClientController {
 
     updatePhysics() {
         this.updateGame(this.currentState);
+    }
+
+    calculatePing() {
+        this.pings = this.pings.filter(ping => ping.received > Date.now() - 1000);
+        return Math.round(this.sum(this.pings) / this.pings.length);
+    }
+
+    sum(array) {
+        let counter = 0;
+        for (let i = 0; i < array.length; i++) {
+            counter += array[i].delay;
+        }
+        return counter;
     }
 }
