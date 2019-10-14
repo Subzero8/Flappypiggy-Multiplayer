@@ -1,20 +1,20 @@
 const PIG_HEIGHT = 75;
 const PIG_WIDTH = PIG_HEIGHT * 14 / 9;
-const PIG_MAX_SPEED = 600;
 const PIPE_HEIGHT = 500;
 const PIPE_WIDTH = 200;
 const PIPE_DISTANCE = 700;
-const PIPE_SPEED = -650;
 const GAP_SIZE = PIG_HEIGHT * 4;
 
 const GAME_HEIGHT = 900;
 const GAME_WIDTH = 1600;
 
-const GRAVITY = 3500;
-const PIG_SPEED = -800;
+const GRAVITY = 2;
+const PIG_SPEED = -20;
+const PIPE_SPEED = -10;
+const PIG_MAX_SPEED = 50;
 //can't change
 const SERVER_TICKRATE = 60;
-const CLIENT_TICKRATE = 1;
+const CLIENT_TICKRATE = 20;
 
 const SERVER_TICK_DURATION = 1000 / SERVER_TICKRATE; //in ms
 const CLIENT_TICK_DURATION = 1000 / CLIENT_TICKRATE; //in ms

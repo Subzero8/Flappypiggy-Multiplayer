@@ -1,10 +1,7 @@
 const {PIG_HEIGHT} = require('./Constants');
 const {PIPE_HEIGHT} = require('./Constants');
 const {PIPE_WIDTH} = require('./Constants');
-const {GAME_HEIGHT} = require('./Constants');
 const {GAME_WIDTH} = require('./Constants');
-const {SERVER_TICK_DURATION} = require('./Constants');
-const {SERVER_TICKRATE} = require('./Constants');
 const {GAP_SIZE} = require('./Constants');
 const {PIPE_SPEED} = require('./Constants');
 
@@ -26,9 +23,9 @@ class ServerPipe {
         this.bottomY = this.gapPosition + this.gap;
     }
 
-    update(delta){
-        this.x += this.vx * delta;
+    update(){
+        this.x += this.vx;
     }
 }
 
-module.exports = ServerPipe
+module.exports = ServerPipe;

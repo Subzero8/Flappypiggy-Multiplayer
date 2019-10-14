@@ -8,4 +8,4 @@ class ClientPlayer {
         this.pig.update(delta);
     }
 }
-module.exports = ServerPlayer
+module.exports = ServerPlayer;

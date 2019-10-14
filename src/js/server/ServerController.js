@@ -26,8 +26,9 @@ class ServerController {
 
         this.pipes = [];
         this.pipeCounter = 0;
-        this.serverTime = 0;
-        this.state = new ServerState(this.pipes, this.players, this.serverTime);
+
+        this.serverStep = 0;
+        this.state = new ServerState(this.pipes, this.players, this.serverStep);
 
         //Inputs
         this.packets = [];
@@ -48,8 +49,10 @@ class ServerController {
         this.sendNewMatchNotification();
         this.startLoop();
 
-        this.previousGameLoopTick = Date.now();
         this.previousUpdateClientLoopTick = Date.now();
+
+        this.previousPhysics = 0;
+        this.lagPhysics = 0;
 
     }
 
@@ -100,7 +103,7 @@ class ServerController {
         this.addObserver(new PipeLoopObserver(this));
         //this.addObserver(new ClientUpdateLoopObserver(this));
         this.updateClientLoop();
-        this.gameLoop();
+        this.physicsLoop();
     }
 
     sendUpdates() {
@@ -112,7 +115,6 @@ class ServerController {
     updateClientLoop() {
         let now = Date.now();
         if (this.previousUpdateClientLoopTick + CLIENT_TICK_DURATION <= now) {
-            let delta = (now - this.previousUpdateClientLoopTick) / 1000;
             this.previousUpdateClientLoopTick = now;
             this.sendUpdates();
         }
@@ -123,35 +125,34 @@ class ServerController {
         }
     }
 
-    gameLoop() {
+    physicsLoop() {
+        setImmediate(this.physicsLoop.bind(this));
         let now = Date.now();
-        if (this.previousGameLoopTick + SERVER_TICK_DURATION <= now) {
-            let delta = (now - this.previousGameLoopTick) / 1000;
-            this.previousGameLoopTick = now;
+        let delta = now - this.previousPhysics;
+        if (delta > 1000) {
+            delta = SERVER_TICK_DURATION;
+        }
+        this.lagPhysics += delta;
+        if (this.lagPhysics >= SERVER_TICK_DURATION) {
             if (this.matchStarted) {
-                this.update(delta);
+                this.updatePhysics();
                 this.handleInputs();
                 this.notifyObservers(delta);
-                this.serverTime += delta;
             }
+            this.lagPhysics -= SERVER_TICK_DURATION;
         }
-
-        if (Date.now() - this.previousGameLoopTick < SERVER_TICK_DURATION - 16) {
-            setTimeout(() => this.gameLoop());
-        } else {
-            setImmediate(() => this.gameLoop());
-        }
+        this.previousPhysics = now;
     }
 
     addObserver(observer) {
         this.observers.push(observer);
     }
 
-    update(delta) {
-        this.updatePlayers(delta);
-        this.updatePipes(delta);
+    updatePhysics() {
+        this.updatePlayers();
+        this.updatePipes();
         //this.checkCollision();
-        this.state.serverTime = this.serverTime;
+        this.state.serverStep++;
     }
 
     handleInputs() {
@@ -168,7 +169,6 @@ class ServerController {
     }
 
     stopLoop() {
-        clearInterval(this.gameLoop);
         clearInterval(this.updateClientLoop);
         //gameloop.clearGameLoop(this.loop);
     }
@@ -240,10 +240,10 @@ class ServerController {
     }
 
 
-    updatePipes(delta) {
+    updatePipes() {
         for (let i = this.pipes.length - 1; i >= 0; i--) {
             let pipe = this.pipes[i];
-            pipe.update(delta);
+            pipe.update();
             if (pipe.x + pipe.width < 0) {
                 this.pipes.shift();
             }

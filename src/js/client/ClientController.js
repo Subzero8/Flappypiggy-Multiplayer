@@ -7,9 +7,12 @@ class ClientController {
         this.running = false;
 
         this.inputHistory = [];
-        this.sequenceNumber = 0;
-        this.clientTime = 0;
+        this.clientStep = 0;
         this.running = false;
+
+
+        this.previousPhysics = 0;
+        this.lagPhysics = 0;
 
         this.initializeNetworking();
     }
@@ -51,9 +54,34 @@ class ClientController {
         this.startLoop();
     }
 
+    physicsLoop() {
+        requestAnimationFrame(this.physicsLoop.bind(this));
+        let now = Date.now();
+        let delta = now - this.previousPhysics;
+        if (delta > 1000) {
+            delta = SERVER_TICK_DURATION;
+        }
+        this.lagPhysics += delta;
+        if (this.lagPhysics >= SERVER_TICK_DURATION) {
+            if (this.running) {
+                this.updatePhysics();
+                this.clientStep++;
+            }
+            this.lagPhysics -= SERVER_TICK_DURATION;
+        }
+        this.previousPhysics = now;
+    }
+
     startLoop() {
         this.startTime = Date.now();
-        requestAnimationFrame(this.gameLoop.bind(this))
+        this.gameLoop();
+        this.physicsLoop();
+        /*setInterval(() => {
+            console.log(this.currentState.players.find(player => player.number === this.localPlayerNumber).pig.vy);
+            if (this.currentState.players.find(player => player.number === this.localPlayerNumber).pig.vy >= -PIG_SPEED){
+                this.pendingInputs.push('jump')
+            }
+        },400);*/
     }
 
     gameLoop(time) {
@@ -70,14 +98,13 @@ class ClientController {
             this.sendInputsToServer();
             if (this.running) {
                 this.applyInputs();
-                this.updateGame(delta / 1000, this.currentState);
                 this.render();
-                this.clientTime += delta/1000;
             }
         }
 
         requestAnimationFrame(this.gameLoop.bind(this));
     }
+
     applyInputs() {
         let localPlayer = this.currentState.players.find(player => player.number === this.localPlayerNumber);
         this.pendingInputs.forEach(() => {
@@ -98,22 +125,21 @@ class ClientController {
                 data: this.pendingInputs
             });
 
-            this.inputHistory.push(this.clientTime);
+            this.inputHistory.push(this.clientStep);
         }
     }
 
-    updateGame(delta, state) {
+    updateGame(state) {
         state.pipes.forEach(pipe => {
-            pipe.x += PIPE_SPEED * delta;
+            pipe.x += PIPE_SPEED;
         });
-
         state.players.forEach(player => {
-            player.pig.y += player.pig.vy * delta;
+            player.pig.y += player.pig.vy;
             if (player.pig.y >= GAME_HEIGHT) {
                 player.pig.y = GAME_HEIGHT
             }
-            if (player.pig.vy + GRAVITY * delta < PIG_MAX_SPEED){
-                player.pig.vy += GRAVITY * delta;
+            if (player.pig.vy + GRAVITY < PIG_MAX_SPEED) {
+                player.pig.vy += GRAVITY;
             }
         })
     }
@@ -122,19 +148,17 @@ class ClientController {
     setListeners() {
         let z = new KeyListener('z');
         z.press = () => {
-            if (!this.running){
+            if (!this.running) {
                 this.socket.emit('ready');
-            }
-            else{
+            } else {
                 this.pendingInputs.push('jump');
             }
         };
 
         window.addEventListener('touchstart', () => {
-            if (!this.running){
+            if (!this.running) {
                 this.socket.emit('ready');
-            }
-            else{
+            } else {
                 this.pendingInputs.push('jump');
             }
         });
@@ -142,13 +166,13 @@ class ClientController {
 
     serverReconciliation() {
         this.discardProcessedInputs();
-        this.simulateGame()
+        this.simulateGame();
 
     }
 
     discardProcessedInputs() {
-        this.inputHistory = this.inputHistory.filter(inputTime => {
-            return inputTime > this.serverState.serverTime;
+        this.inputHistory = this.inputHistory.filter(inputStep => {
+            return inputStep > this.serverState.serverStep;
         });
     }
 
@@ -200,19 +224,29 @@ class ClientController {
 
     simulateGame() {
         let state = this.getCopy(this.serverState);
-        let serverStateTime = state.serverTime;
-        if (this.inputHistory.length > 0){
+        let serverStep = state.serverStep;
+        if (this.inputHistory.length > 0) {
+            console.log(this.inputHistory.length);
             for (let i = 0; i < this.inputHistory.length; i++) {
-                console.log('this.inputHistory', this.inputHistory);
-                let nextInputTime = this.inputHistory.shift();
-                this.updateGame(nextInputTime - serverStateTime, state);
+                let nextInputStep = this.inputHistory.shift();
+                for (let j = 0; j < nextInputStep - serverStep; j++) {
+                    this.updateGame(state);
+                }
             }
+        } else {
+            console.log(this.clientStep - serverStep, ' (', this.clientStep, '-', serverStep, ')');
+            for (let i = 0; i < this.clientStep - serverStep; i++) {
+                console.log('fixing game state');
+                this.updateGame(state);
+            }
+            this.clientStep = serverStep;
         }
-        else{
-            this.updateGame(this.clientTime - serverStateTime, state);
-        }
+
         this.currentState = this.getCopy(state);
     }
 
 
+    updatePhysics() {
+        this.updateGame(this.currentState);
+    }
 }

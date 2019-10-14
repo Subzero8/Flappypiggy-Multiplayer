@@ -1,8 +1,8 @@
 class ServerState {
-    constructor(pipes, players, serverTime) {
+    constructor(pipes, players, serverStep) {
         this.pipes = pipes;
         this.players = players;
-        this.serverTime = serverTime;
+        this.serverStep = serverStep;
     }
 }
 

@@ -18,13 +18,13 @@ class ServerPig {
         this.vy = PIG_SPEED;
     }
 
-    update(delta) {
-        this.y += this.vy * delta;
+    update() {
+        this.y += this.vy;
         if (this.y >= GAME_HEIGHT) {
             this.y = GAME_HEIGHT
         }
-        if ((this.vy + GRAVITY * delta) < PIG_MAX_SPEED){
-            this.vy += GRAVITY * delta;
+        if ((this.vy + GRAVITY) < PIG_MAX_SPEED){
+            this.vy += GRAVITY;
         }
     }
 }
