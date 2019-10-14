@@ -105,7 +105,7 @@ class ClientController {
         if (delta >= UPDATE_FRAME_TIME) {
             this.sendInputsToServer();
             if (this.running) {
-                this.applyInputs();
+                this.pendingInputs = [];
                 this.render();
             }
         }
@@ -113,12 +113,11 @@ class ClientController {
         requestAnimationFrame(this.gameLoop.bind(this));
     }
 
-    applyInputs() {
-        let localPlayer = this.currentState.players.find(player => player.number === this.localPlayerNumber);
-        this.pendingInputs.forEach(() => {
+    applyInput(state) {
+        let localPlayer = state.players.find(player => player.number === this.localPlayerNumber);
+        if (this.pendingInputs.length > 0){
             localPlayer.pig.vy = PIG_SPEED;
-        });
-        this.pendingInputs = [];
+        }
     }
 
     getCopy(object) {
@@ -160,6 +159,7 @@ class ClientController {
                 this.socket.emit('ready');
             } else {
                 this.pendingInputs.push('jump');
+                this.applyInput(this.currentState);
             }
         };
 
@@ -233,23 +233,27 @@ class ClientController {
     simulateGame() {
         let state = this.getCopy(this.serverState);
         let serverStep = state.serverStep;
+        let newStep = this.clientStep;
+        console.log(this.clientStep - serverStep, ' (', this.clientStep, '-', serverStep, ')');
+        // console.log(serverStep - this.clientStep, ' (', serverStep, '-', this.clientStep, ')');
         if (this.inputHistory.length > 0) {
-            console.log(this.inputHistory.length);
+            console.log('THERE IS INPUT UNPROCESSED !!!');
             for (let i = 0; i < this.inputHistory.length; i++) {
                 let nextInputStep = this.inputHistory.shift();
                 for (let j = 0; j < nextInputStep - serverStep; j++) {
                     this.updateGame(state);
+                    newStep++
                 }
+                this.applyInput(state);
             }
         } else {
-            console.log(this.clientStep - serverStep, ' (', this.clientStep, '-', serverStep, ')');
             for (let i = 0; i < this.clientStep - serverStep; i++) {
-                console.log('fixing game state');
+                console.log(i + '. fixing game state');
                 this.updateGame(state);
+                newStep++;
             }
-            this.clientStep = serverStep;
         }
-
+        this.clientStep = newStep;
         this.currentState = this.getCopy(state);
     }
 

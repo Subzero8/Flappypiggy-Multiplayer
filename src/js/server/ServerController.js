@@ -35,6 +35,7 @@ class ServerController {
         this.players.forEach(player => {
             this.getSocket(player.number).on('packet', packet => {
                 this.packets.push(packet);
+                this.handleInputs()
             });
             this.getSocket(player.number).on('ready', () => {
                 if (!this.countdownStarted) {
@@ -142,8 +143,9 @@ class ServerController {
         if (this.lagPhysics >= SERVER_TICK_DURATION) {
             if (this.matchStarted) {
                 this.updatePhysics();
-                this.handleInputs();
+                //this.handleInputs();
                 this.notifyObservers(delta);
+                this.state.serverStep++;
             }
             this.lagPhysics -= SERVER_TICK_DURATION;
         }
@@ -158,14 +160,13 @@ class ServerController {
         this.updatePlayers();
         this.updatePipes();
         //this.checkCollision();
-        this.state.serverStep++;
     }
 
     handleInputs() {
         this.packets.forEach(packet => {
             let player = this.getPlayer(packet.id);
             console.log(packet);
-            packet.data.forEach(() => player.pig.vy = PIG_SPEED);
+            player.pig.vy = PIG_SPEED;
         });
         this.packets = [];
     }
