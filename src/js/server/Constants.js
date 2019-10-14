@@ -1,6 +1,6 @@
 const PIG_HEIGHT = 75;
 const PIG_WIDTH = PIG_HEIGHT * 14 / 9;
-
+const PIG_MAX_SPEED = 600;
 const PIPE_HEIGHT = 500;
 const PIPE_WIDTH = 200;
 const PIPE_DISTANCE = 700;
@@ -14,9 +14,10 @@ const GRAVITY = 3500;
 const PIG_SPEED = -800;
 //can't change
 const SERVER_TICKRATE = 60;
-const CLIENT_TICKRATE = 20;
+const CLIENT_TICKRATE = 1;
 
 const SERVER_TICK_DURATION = 1000 / SERVER_TICKRATE; //in ms
+const CLIENT_TICK_DURATION = 1000 / CLIENT_TICKRATE; //in ms
 
 module.exports = {
     PIG_HEIGHT,
@@ -32,5 +33,7 @@ module.exports = {
     SERVER_TICKRATE,
     CLIENT_TICKRATE,
     SERVER_TICK_DURATION,
-    PIPE_DISTANCE
-}
+    CLIENT_TICK_DURATION,
+    PIPE_DISTANCE,
+    PIG_MAX_SPEED
+};

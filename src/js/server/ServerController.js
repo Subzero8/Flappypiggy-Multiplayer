@@ -1,22 +1,14 @@
 const ServerClient = require('./ServerClient');
 const PipeLoopObserver = require('./PipeLoopObserver');
-const ClientUpdateLoopObserver = require('./ClientUpdateLoopObserver');
-const ServerPacket = require('./ServerInput');
 const ServerState = require('./ServerState');
 
-const gameloop = require('node-gameloop');
 const {SERVER_TICK_DURATION} = require("./Constants");
 
-const {
-    SERVER_TICKRATE
-} = require('./Constants');
-const {
-    PIG_SPEED
-} = require('./Constants');
+const {CLIENT_TICK_DURATION} = require('./Constants');
 
-const {
-    GAME_HEIGHT
-} = require('./Constants');
+const {PIG_SPEED} = require('./Constants');
+
+const {GAME_HEIGHT} = require('./Constants');
 
 
 class ServerController {
@@ -34,33 +26,30 @@ class ServerController {
 
         this.pipes = [];
         this.pipeCounter = 0;
-        this.serverStep = 0;
-        this.state = new ServerState(this.pipes, this.players, this.serverStep);
+        this.serverTime = 0;
+        this.state = new ServerState(this.pipes, this.players, this.serverTime);
 
         //Inputs
         this.packets = [];
         this.players.forEach(player => {
             this.getSocket(player.number).on('packet', packet => {
-                this.packets.push(new ServerPacket(player.number, packet.data));
+                this.packets.push(packet);
                 this.handleInputs();
-            })
+            });
+            this.getSocket(player.number).on('ready', () => {
+                if (!this.countdownStarted) {
+                    this.startCountdown();
+                }
+            });
         });
-        this.loop;
-        this.currentTime;
         this.observers = [];
-
-        this.running = false;
         this.matchStarted = false;
         this.countdownStarted = false;
         this.sendNewMatchNotification();
         this.startLoop();
 
-        this.previousState = [];
-        // this.ended = false;
-
-        this.previousTick = Date.now();
-        // number of times gameLoop gets called
-        this.actualTicks = 0;
+        this.previousGameLoopTick = Date.now();
+        this.previousUpdateClientLoopTick = Date.now();
 
     }
 
@@ -98,7 +87,6 @@ class ServerController {
             this.players.forEach(player => {
                 this.getSocket(player.number).emit('countdown', 0);
             });
-            this.players.forEach(player => player.pig.vy = PIG_SPEED);
             this.matchStarted = true;
         }, 3000);
         setTimeout(() => {
@@ -110,24 +98,45 @@ class ServerController {
 
     startLoop() {
         this.addObserver(new PipeLoopObserver(this));
-        this.addObserver(new ClientUpdateLoopObserver(this));
+        //this.addObserver(new ClientUpdateLoopObserver(this));
+        this.updateClientLoop();
         this.gameLoop();
     }
-    gameLoop () {
-        let now = Date.now();
 
-        this.actualTicks++;
-        if (this.previousTick + SERVER_TICK_DURATION <= now) {
-            let delta = (now - this.previousTick) / 1000;
-            this.previousTick = now;
+    sendUpdates() {
+        this.sockets.forEach(socket => {
+            socket.emit('updateState', this.state);
+        });
+    }
+
+    updateClientLoop() {
+        let now = Date.now();
+        if (this.previousUpdateClientLoopTick + CLIENT_TICK_DURATION <= now) {
+            let delta = (now - this.previousUpdateClientLoopTick) / 1000;
+            this.previousUpdateClientLoopTick = now;
+            this.sendUpdates();
+        }
+        if (Date.now() - this.previousUpdateClientLoopTick < CLIENT_TICK_DURATION - 16) {
+            setTimeout(() => this.updateClientLoop());
+        } else {
+            setImmediate(() => this.updateClientLoop());
+        }
+    }
+
+    gameLoop() {
+        let now = Date.now();
+        if (this.previousGameLoopTick + SERVER_TICK_DURATION <= now) {
+            let delta = (now - this.previousGameLoopTick) / 1000;
+            this.previousGameLoopTick = now;
             if (this.matchStarted) {
                 this.update(delta);
+                this.handleInputs();
                 this.notifyObservers(delta);
+                this.serverTime += delta;
             }
-            this.actualTicks = 0
         }
 
-        if (Date.now() - this.previousTick < SERVER_TICK_DURATION - 16) {
+        if (Date.now() - this.previousGameLoopTick < SERVER_TICK_DURATION - 16) {
             setTimeout(() => this.gameLoop());
         } else {
             setImmediate(() => this.gameLoop());
@@ -142,40 +151,31 @@ class ServerController {
         this.updatePlayers(delta);
         this.updatePipes(delta);
         //this.checkCollision();
-        this.state.serverStep++;
+        this.state.serverTime = this.serverTime;
     }
 
     handleInputs() {
-        if (!this.countdownStarted && this.packets.length > 0) {
-            this.startCountdown();
-        } else {
-            this.packets.forEach(packet => {
-                let player = this.getPlayer(packet.playerNumber);
-                console.log(packet);
-                packet.data.forEach(d => {
-                    switch (d) {
-                        case 'jump':
-                            player.pig.vy = PIG_SPEED;
-                            break;
-                        default:
-
-                    }
-                })
-            });
-            this.packets = [];
-        }
+        this.packets.forEach(packet => {
+            let player = this.getPlayer(packet.id);
+            console.log(packet);
+            packet.data.forEach(() => player.pig.vy = PIG_SPEED);
+        });
+        this.packets = [];
     }
+
     getPlayer(number) {
-        return this.players.find(player => player.number == number);
+        return this.players.find(player => player.number === number);
     }
 
     stopLoop() {
-        gameloop.clearGameLoop(this.loop);
+        clearInterval(this.gameLoop);
+        clearInterval(this.updateClientLoop);
+        //gameloop.clearGameLoop(this.loop);
     }
 
     //updates pig positions
     updatePlayers(delta) {
-        this.players.forEach(player => player.update(delta))
+        this.players.forEach(player => player.pig.update(delta))
     }
 
     checkCollision() {
@@ -188,7 +188,7 @@ class ServerController {
         if (loser) {
             console.log('game over');
             loser.socket.emit('lost');
-            this.player.socket.find(player => player.socket.id != loser.socket.id).emit('won');
+            this.player.socket.find(player => player.socket.id !== loser.socket.id).emit('won');
             gameloop.clearGameLoop(this.loop);
         }
     }
@@ -238,9 +238,6 @@ class ServerController {
         };
         return pigHitbox.y + pigHitbox.height > GAME_HEIGHT
     }
-
-
-
 
 
     updatePipes(delta) {

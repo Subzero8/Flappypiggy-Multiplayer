@@ -1,12 +1,10 @@
-const ServerPig = require('./ServerPig')
+const ServerPig = require('./ServerPig');
 
 class ServerClient {
     constructor(number) {
         this.pig = new ServerPig();
         this.number = number;
-    }
-    update(delta){
-        this.pig.update(delta);
+        this.sequenceNumber = -1;
     }
 }
 module.exports = ServerClient;

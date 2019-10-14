@@ -13,7 +13,6 @@ class Scene {
         this.updatePigs(state);
         this.updatePipes(state);
         this.deleteUnusedPipes(state);
-
     }
 
     deleteUnusedPipes(state) {

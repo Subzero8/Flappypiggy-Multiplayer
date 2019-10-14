@@ -1,6 +1,6 @@
 const PIG_HEIGHT = 75;
 const PIG_WIDTH = PIG_HEIGHT * 14 / 9;
-
+const PIG_MAX_SPEED = 600;
 const PIPE_HEIGHT = 500;
 const PIPE_WIDTH = 200;
 const PIPE_DISTANCE = 700;
@@ -15,6 +15,7 @@ const PIG_SPEED = -800;
 //can't change
 const SERVER_TICKRATE = 60;
 
+const SERVER_TICK_DURATION = 1000 / SERVER_TICKRATE; //in ms
 const CLIENT_TICKRATE = 20;
 const INTERPOLATION_PERIOD = 1000/CLIENT_TICKRATE * 2;
 

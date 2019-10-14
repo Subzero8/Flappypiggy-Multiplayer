@@ -1,7 +1,7 @@
 class ClientState {
-    constructor(pipes, players, serverStep) {
+    constructor(pipes, players, serverTime) {
         this.pipes = pipes;
         this.players = players;
-        this.serverTime = serverStep;
+        this.serverTime = serverTime;
     }
 }

@@ -22,8 +22,8 @@ function connectionHandler(socket) {
     if (notEmpty(availableSockets)) {
         let opponentSocket = availableSockets.pop();
         // printAvailableSocket(opponentSocket);
-        let sockets = [socket, opponentSocket]
-        let match = new ServerController(sockets)
+        let sockets = [socket, opponentSocket];
+        let match = new ServerController(sockets);
         matches[socket.id] = match;
         matches[opponentSocket.id] = match;
 
@@ -35,21 +35,15 @@ function connectionHandler(socket) {
             matches[socket.id].stopLoop();
         }
         disconnectClient(socket)
-    })
-
-    socket.on('ready', () => {
-        console.log('[Match Ready]')
-        match.socket.emit('startMatch')
-        match.opponent.emit('startMatch')
-    })
+    });
     socket.on('gameOver', () => match.opponent.emit('won'))
 }
 
-http.listen(port, () => console.log(`Example app listening on port ${port}!`))
+http.listen(port, () => console.log(`Example app listening on port ${port}!`));
 
 function disconnectClient(socket) {
-    console.log('[Disconnected] -> ' + socket.id)
-    sockets = sockets.filter(s => s != socket)
+    console.log('[Disconnected] -> ' + socket.id);
+    sockets = sockets.filter(s => s != socket);
     availableSockets = availableSockets.filter(s => s != socket)
 }
 

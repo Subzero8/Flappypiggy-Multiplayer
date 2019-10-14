@@ -2,62 +2,53 @@ class ClientController {
     constructor(scene, socket) {
         this.scene = scene;
         this.socket = socket;
-        this.localPlayerNumber;
 
         this.pendingInputs = [];
-
-        this.startTime;
-        this.lastFrame;
         this.running = false;
 
-        this.statesHistory = [];
-        this.lastState;
-        this.currentState;
-        this.serverState;
-        this.statesHistory = [];
-        this.timeSinceLastServerSnapshot = 0;
+        this.inputHistory = [];
+        this.sequenceNumber = 0;
+        this.clientTime = 0;
+        this.running = false;
 
         this.initializeNetworking();
     }
 
     initializeNetworking() {
-        this.socket.on('updateState', serverState => {
-            this.serverState = serverState;
-            this.correctActorsPosition();
-            //this.statesHistory.push(serverState);
-            this.timeSinceLastServerSnapshot = 0;
-            //this.serverReconciliation();
-        });
-        this.socket.on('localPlayerNumber', number => {
-            this.localPlayerNumber = number;
+        this.socket.on('updateState', serverState => this.onServerUpdate(serverState));
+        this.socket.on('localPlayerNumber', number => this.localPlayerNumber = number);
+        this.socket.on('newMatch', serverState => this.onNewMatch(serverState));
+    }
 
-            console.log(number);
-        });
-        this.socket.on('newMatch', serverState => {
-            console.log("[MATCH FOUND]");
-            this.currentState = serverState;
-            this.setListeners();
-            //initialize Scene
-            this.scene.initialize(serverState, this.localPlayerNumber);
-            this.scene.displayMessage(this.scene.annoncer, 'Match Found !');
-            this.socket.on('won', () => this.scene.displayMessage(this.scene.annoncer, 'You Won !'));
-            this.socket.on('lost', () => this.scene.displayMessage(this.scene.annoncer, 'You Lost !'));
-            this.socket.on('countdown', count => {
-                switch (count) {
-                    case 0:
-                        this.scene.displayMessage(this.scene.annoncer, 'Go !');
-                        this.running = true;
-                        break;
-                    case -1:
-                        this.scene.displayMessage(this.scene.annoncer, '');
-                        break;
-                    default:
-                        this.scene.displayMessage(this.scene.annoncer, count)
+    onServerUpdate(serverState) {
+        this.serverState = this.getCopy(serverState);
+        this.serverReconciliation();
+    }
 
-                }
-            });
-            this.startLoop();
-        })
+    onNewMatch(serverState) {
+        console.log("[MATCH FOUND]");
+        this.currentState = this.getCopy(serverState);
+        this.setListeners();
+        //initialize Scene
+        this.scene.initialize(this.currentState, this.localPlayerNumber);
+        this.scene.displayMessage(this.scene.annoncer, 'Match Found !');
+        this.socket.on('won', () => this.scene.displayMessage(this.scene.annoncer, 'You Won !'));
+        this.socket.on('lost', () => this.scene.displayMessage(this.scene.annoncer, 'You Lost !'));
+        this.socket.on('countdown', count => {
+            switch (count) {
+                case 0:
+                    this.scene.displayMessage(this.scene.annoncer, 'Go !');
+                    this.running = true;
+                    break;
+                case -1:
+                    this.scene.displayMessage(this.scene.annoncer, '');
+                    break;
+                default:
+                    this.scene.displayMessage(this.scene.annoncer, count)
+
+            }
+        });
+        this.startLoop();
     }
 
     startLoop() {
@@ -72,20 +63,17 @@ class ClientController {
             this.startTime = time;
         } else {
             currentFrame = Math.round((time - this.startTime) / UPDATE_FRAME_TIME);
-
             delta = (currentFrame - this.lastFrame) * UPDATE_FRAME_TIME;
         }
         this.lastFrame = currentFrame;
-
         if (delta >= UPDATE_FRAME_TIME) {
-            console.log(delta);
-            this.processInput();
+            this.sendInputsToServer();
             if (this.running) {
-                this.update(delta / 1000);
+                this.applyInputs();
+                this.updateGame(delta / 1000, this.currentState);
                 this.render();
-                this.lastState = this.getCopy(this.currentState);
+                this.clientTime += delta/1000;
             }
-            this.timeSinceLastServerSnapshot += delta;
         }
 
         requestAnimationFrame(this.gameLoop.bind(this));
@@ -94,7 +82,8 @@ class ClientController {
         let localPlayer = this.currentState.players.find(player => player.number === this.localPlayerNumber);
         this.pendingInputs.forEach(() => {
             localPlayer.pig.vy = PIG_SPEED;
-        })
+        });
+        this.pendingInputs = [];
     }
 
     getCopy(object) {
@@ -102,50 +91,64 @@ class ClientController {
     }
 
     sendInputsToServer() {
-        this.sendInputs(this.pendingInputs);
-        this.pendingInputs = [];
+        if (this.pendingInputs.length > 0) {
+            this.socket.emit('packet', {
+                id: this.localPlayerNumber,
+                action: 'input',
+                data: this.pendingInputs
+            });
+
+            this.inputHistory.push(this.clientTime);
+        }
     }
 
-    update(delta) {
-        //predict position of each pipes
-        this.currentState.pipes.forEach(pipe => {
+    updateGame(delta, state) {
+        state.pipes.forEach(pipe => {
             pipe.x += PIPE_SPEED * delta;
         });
 
-        this.currentState.players.forEach(player => {
+        state.players.forEach(player => {
             player.pig.y += player.pig.vy * delta;
             if (player.pig.y >= GAME_HEIGHT) {
                 player.pig.y = GAME_HEIGHT
             }
-            player.pig.vy += GRAVITY * delta;
+            if (player.pig.vy + GRAVITY * delta < PIG_MAX_SPEED){
+                player.pig.vy += GRAVITY * delta;
+            }
         })
     }
 
 
     setListeners() {
-        let space = new KeyListener(' ');
-        space.press = () => {
-            this.pendingInputs.push('jump');
+        let z = new KeyListener('z');
+        z.press = () => {
+            if (!this.running){
+                this.socket.emit('ready');
+            }
+            else{
+                this.pendingInputs.push('jump');
+            }
         };
 
         window.addEventListener('touchstart', () => {
-            this.pendingInputs.push('jump');
+            if (!this.running){
+                this.socket.emit('ready');
+            }
+            else{
+                this.pendingInputs.push('jump');
+            }
         });
     }
 
     serverReconciliation() {
-        let localPlayer = this.currentState.players.find(p => p.number === this.localPlayerNumber);
-
-        this.discardCopy(lastSequenceNumberProcessed);
-        this.requestsManager.packetsHistory.forEach(packet => {
-            packet.data.forEach(input => clientSidePrediction(input));
-        })
+        this.discardProcessedInputs();
+        this.simulateGame()
 
     }
 
-    discardCopy(lastSequenceNumberProcessed) {
-        this.requestsManager.packetsHistory = this.requestsManager.packetsHistory.filter(packet => {
-            packet.sequenceNumber > lastSequenceNumberProcessed;
+    discardProcessedInputs() {
+        this.inputHistory = this.inputHistory.filter(inputTime => {
+            return inputTime > this.serverState.serverTime;
         });
     }
 
@@ -186,26 +189,30 @@ class ClientController {
 
     }
 
-    sendInputs(inputs) {
-        if (inputs.length > 0) {
-            let packet = {
-                action: 'input',
-                data: inputs
-            };
-            this.socket.emit('packet', packet);
-        }
-    }
-
     lerp(start, end, time) {
         return start * (1 - time) + end * time;
     }
 
-    processInput() {
-        this.sendInputsToServer();
-        this.applyInputs();
-    }
 
     render() {
         this.scene.render(this.currentState);
     }
+
+    simulateGame() {
+        let state = this.getCopy(this.serverState);
+        let serverStateTime = state.serverTime;
+        if (this.inputHistory.length > 0){
+            for (let i = 0; i < this.inputHistory.length; i++) {
+                console.log('this.inputHistory', this.inputHistory);
+                let nextInputTime = this.inputHistory.shift();
+                this.updateGame(nextInputTime - serverStateTime, state);
+            }
+        }
+        else{
+            this.updateGame(this.clientTime - serverStateTime, state);
+        }
+        this.currentState = this.getCopy(state);
+    }
+
+
 }

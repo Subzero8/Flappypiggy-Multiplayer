@@ -1,6 +1,4 @@
-const {
-    CLIENT_TICKRATE
-} = require('./Constants');
+const {CLIENT_TICK_DURATION} = require('./Constants');
 
 class ClientUpdateLoopObserver {
     constructor(match) {
@@ -14,13 +12,15 @@ class ClientUpdateLoopObserver {
     }
 
     sendState(currentTime) {
-        if (currentTime - this.lastTickTime >= 1000 / CLIENT_TICKRATE) {
+        if (currentTime - this.lastTickTime >= CLIENT_TICK_DURATION) {
+            console.log(currentTime - this.lastTickTime);
             this.match.sockets.forEach(socket => {
                 socket.emit('updateState', this.match.state);
-            })
+            });
 
             this.lastTickTime = currentTime;
         }
     }
 }
+
 module.exports = ClientUpdateLoopObserver;

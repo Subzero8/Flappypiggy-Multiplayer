@@ -5,7 +5,7 @@ const GAME_WIDTH = require('./Constants').GAME_WIDTH;
 class PipeLoopObserver {
     constructor(match) {
         this.match = match;
-        this.lastPipe;
+        this.lastPipe = null;
     }
 
     notify(currentTime, delta) {
