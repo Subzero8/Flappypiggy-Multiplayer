@@ -261,7 +261,6 @@ class ClientController {
     }
 
     calculatePing() {
-        console.log(this.pings);
         this.pings = this.pings.filter(ping => ping.received > Date.now() - 3000);
         return Math.round(this.sum(this.pings) / this.pings.length);
     }
