@@ -231,8 +231,8 @@ class ClientController {
     }
 
     simulateGame() {
-        let state = this.getCopy(this.serverState);
-        let serverStep = state.serverStep;
+        let newState = this.getCopy(this.serverState);
+        let serverStep = newState.serverStep;
         let newStep = this.clientStep;
         console.log(this.clientStep - serverStep, ' (', this.clientStep, '-', serverStep, ')');
         // console.log(serverStep - this.clientStep, ' (', serverStep, '-', this.clientStep, ')');
@@ -241,20 +241,20 @@ class ClientController {
             for (let i = 0; i < this.inputHistory.length; i++) {
                 let nextInputStep = this.inputHistory.shift();
                 for (let j = 0; j < nextInputStep - serverStep; j++) {
-                    this.updateGame(state);
+                    this.updateGame(newState);
                     newStep++
                 }
-                this.applyInput(state);
+                this.applyInput(newState);
             }
         } else {
             for (let i = 0; i < this.clientStep - serverStep; i++) {
-                console.log(i + '. fixing game state');
-                this.updateGame(state);
+                //console.log(i + '. fixing game state');
+                this.updateGame(newState);
                 newStep++;
             }
         }
         this.clientStep = newStep;
-        this.currentState = this.getCopy(state);
+        this.currentState = this.getCopy(newState);
     }
 
 
