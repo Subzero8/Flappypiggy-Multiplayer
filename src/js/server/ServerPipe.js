@@ -26,6 +26,18 @@ class ServerPipe {
     update(){
         this.x += this.vx;
     }
+
+    copy(){
+        let copy = new ServerPipe(this.number);
+        copy.x = this.x;
+
+        copy.gap = this.gap;
+        copy.gapPosition = this.gapPosition;
+
+        copy.topY = this.topY;
+        copy.bottomY = this.bottomY;
+        return copy;
+    }
 }
 
 module.exports = ServerPipe;

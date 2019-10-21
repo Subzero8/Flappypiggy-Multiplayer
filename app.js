@@ -36,7 +36,7 @@ function connectionHandler(socket) {
         }
         disconnectClient(socket)
     });
-    socket.on('gameOver', () => match.opponent.emit('won'))
+    //socket.on('gameOver', () => match.opponent.emit('won'))
 }
 
 http.listen(port, () => console.log(`Example app listening on port ${port}!`));

@@ -6,8 +6,10 @@ class ClientController {
         this.pendingInputs = [];
         this.running = false;
 
-        this.inputHistory = [];
+        this.inputHistory = new Map();
         this.clientStep = 0;
+        this.sequenceNumber = -1;
+
         this.running = false;
 
         //for physics loop
@@ -15,15 +17,37 @@ class ClientController {
         this.lagPhysics = 0;
         //for ping calculation
         this.pings = [];
-        this.ping = null;
 
         this.initializeNetworking();
     }
 
     initializeNetworking() {
-        this.socket.on('updateState', packet => this.onServerUpdate(packet));
-        this.socket.on('localPlayerNumber', number => this.localPlayerNumber = number);
-        this.socket.on('newMatch', packet => this.onNewMatch(packet));
+        this.socket.on('packet', packet => {
+            switch (packet.action) {
+                case "newGame":
+                    this.onNewMatch(packet);
+                    break;
+                case "serverUpdate":
+                    this.onServerUpdate(packet);
+                    break;
+                case "id":
+                    this.id = packet.id;
+                    break;
+                // case "serverStep":
+                //     console.log(packet.step);
+                //     this.socket.emit('packet', {
+                //         action: 'clientStep',
+                //         step: packet.step
+                //     });
+                //     break;
+                // case "roundTrip":
+                //     this.clientStep = Math.round(packet.roundTrip/2 + 1);
+                //     console.log(this.clientStep);
+                //     this.simulateGame(this.clientStep);
+                //     this.render();
+                //     break;
+            }
+        });
     }
 
     onServerUpdate(packet) {
@@ -38,10 +62,11 @@ class ClientController {
 
     onNewMatch(packet) {
         console.log("[MATCH FOUND]");
-        this.onServerUpdate(packet);
+        this.startLoop();
+        this.currentState = packet.state;
         this.setListeners();
         //initialize Scene
-        this.scene.initialize(this.currentState, this.localPlayerNumber);
+        this.scene.initialize(this.currentState, this.id);
         this.scene.displayMessage(this.scene.annoncer, 'Match Found !');
         this.socket.on('won', () => this.scene.displayMessage(this.scene.annoncer, 'You Won !'));
         this.socket.on('lost', () => this.scene.displayMessage(this.scene.annoncer, 'You Lost !'));
@@ -59,7 +84,7 @@ class ClientController {
 
             }
         });
-        this.startLoop();
+
     }
 
     physicsLoop() {
@@ -71,9 +96,9 @@ class ClientController {
         }
         this.lagPhysics += delta;
         if (this.lagPhysics >= SERVER_TICK_DURATION) {
+            this.sendInputsToServer();
             if (this.running) {
                 this.updatePhysics();
-                this.clientStep++;
             }
             this.lagPhysics -= SERVER_TICK_DURATION;
         }
@@ -84,12 +109,6 @@ class ClientController {
         this.startTime = Date.now();
         this.gameLoop();
         this.physicsLoop();
-        /*setInterval(() => {
-            console.log(this.currentState.players.find(player => player.number === this.localPlayerNumber).pig.vy);
-            if (this.currentState.players.find(player => player.number === this.localPlayerNumber).pig.vy >= -PIG_SPEED){
-                this.pendingInputs.push('jump')
-            }
-        },400);*/
     }
 
     gameLoop(time) {
@@ -103,9 +122,7 @@ class ClientController {
         }
         this.lastFrame = currentFrame;
         if (delta >= UPDATE_FRAME_TIME) {
-            this.sendInputsToServer();
             if (this.running) {
-                this.pendingInputs = [];
                 this.render();
             }
         }
@@ -114,9 +131,12 @@ class ClientController {
     }
 
     applyInput(state) {
-        let localPlayer = state.players.find(player => player.number === this.localPlayerNumber);
-        if (this.pendingInputs.length > 0){
+        let localPlayer = state.players.find(player => player.number === this.id);
+        if (this.pendingInputs.length > 0) {
             localPlayer.pig.vy = PIG_SPEED;
+            console.log('[INPUT APPLIED] ->', this.clientStep);
+            this.inputHistory.set(this.sequenceNumber, this.clientStep);
+            this.sequenceNumber++;
         }
     }
 
@@ -127,13 +147,14 @@ class ClientController {
     sendInputsToServer() {
         if (this.pendingInputs.length > 0) {
             this.socket.emit('packet', {
-                id: this.localPlayerNumber,
                 action: 'input',
+                id: this.id,
+                step: this.clientStep,
+                sequenceNumber: this.sequenceNumber,
                 data: this.pendingInputs
             });
-
-            this.inputHistory.push(this.clientStep);
         }
+        this.pendingInputs = [];
     }
 
     updateGame(state) {
@@ -156,7 +177,9 @@ class ClientController {
         let z = new KeyListener('z');
         z.press = () => {
             if (!this.running) {
-                this.socket.emit('ready');
+                this.socket.emit('packet', {
+                    action: 'ready'
+                });
             } else {
                 this.pendingInputs.push('jump');
                 this.applyInput(this.currentState);
@@ -168,20 +191,23 @@ class ClientController {
                 this.socket.emit('ready');
             } else {
                 this.pendingInputs.push('jump');
+                this.applyInput(this.currentState);
             }
         });
     }
 
+
     serverReconciliation() {
         this.discardProcessedInputs();
-        this.simulateGame();
-
+        this.blabla();
     }
 
     discardProcessedInputs() {
-        this.inputHistory = this.inputHistory.filter(inputStep => {
-            return inputStep > this.serverState.serverStep;
-        });
+        let lastProcessedInputSequenceNumber = this.getPlayer(this.serverState).sequenceNumber;
+        for (let sequenceNumber of this.inputHistory.keys()) {
+            if (sequenceNumber <= lastProcessedInputSequenceNumber)
+                this.inputHistory.delete(sequenceNumber);
+        }
     }
 
     correctActorsPosition() {
@@ -230,34 +256,27 @@ class ClientController {
         this.scene.render(this.currentState);
     }
 
-    simulateGame() {
+    blabla() {
         let newState = this.getCopy(this.serverState);
-        let serverStep = newState.serverStep;
-        let newStep = this.clientStep;
-        console.log(this.clientStep - serverStep, ' (', this.clientStep, '-', serverStep, ')');
-        // console.log(serverStep - this.clientStep, ' (', serverStep, '-', this.clientStep, ')');
-        if (this.inputHistory.length > 0) {
-            console.log('THERE IS INPUT UNPROCESSED !!! (',this.inputHistory.length,')');
-            for (let i = 0; i < this.inputHistory.length; i++) {
-                let nextInputStep = this.inputHistory.shift();
-                console.log('nextInputStep', nextInputStep);
-                for (let j = 0; j < nextInputStep - serverStep; j++) {
-                    this.updateGame(newState);
-                }
-                this.applyInput(newState);
-            }
-        } else {
-            for (let i = 0; i < this.clientStep - serverStep; i++) {
-                //console.log(i + '. fixing game state');
-                this.updateGame(newState);
-            }
+        //console.log('deltaStep: ', deltaStep);
+        let serverStep = this.serverState.step;
+
+        for (let sequenceNumber of this.inputHistory.keys()) {
+            console.log('SEQUENCENUMBER', sequenceNumber);
         }
+        let serverPig = this.getPlayer(this.serverState).pig;
+
+        let clientPig = this.getPlayer(this.currentState).pig;
+        console.log('server_y=', serverPig.y, 'client_y=', clientPig.y, 'deltaStep=', this.clientStep - serverStep, 'inputs lefts=', this.inputHistory.size);
+
         this.currentState = this.getCopy(newState);
+        this.clientStep = this.currentState.step;
     }
 
 
     updatePhysics() {
         this.updateGame(this.currentState);
+        this.clientStep++;
     }
 
     calculatePing() {
@@ -271,5 +290,19 @@ class ClientController {
             counter += array[i].delay;
         }
         return counter;
+    }
+
+    getPlayer(state) {
+        return state.players.find(player => player.number === this.id);
+    }
+
+    sendPacket(packet) {
+
+    }
+
+    simulateGame(nbTicks){
+        for (let i = 0; i < nbTicks; i++) {
+            this.updateGame(this.currentState)
+        }
     }
 }

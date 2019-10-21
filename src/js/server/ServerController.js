@@ -20,7 +20,11 @@ class ServerController {
             let player = new ServerClient(i);
             this.players.push(player);
             this.sockets[player.number] = sockets[player.number];
-            this.getSocket(player.number).emit('localPlayerNumber', player.number);
+            this.getSocket(player.number).emit('packet', {
+                action: 'id',
+                id: player.number
+            });
+
         }
         console.log('[New Match] -> ' + this.sockets.length + ' players.');
 
@@ -32,28 +36,59 @@ class ServerController {
 
         //Inputs
         this.packets = [];
-        this.players.forEach(player => {
-            this.getSocket(player.number).on('packet', packet => {
-                this.packets.push(packet);
-                this.handleInputs()
-            });
-            this.getSocket(player.number).on('ready', () => {
-                if (!this.countdownStarted) {
-                    this.startCountdown();
-                }
-            });
-        });
-        this.observers = [];
-        this.matchStarted = false;
-        this.countdownStarted = false;
-        this.sendNewMatchNotification();
-        this.startLoop();
 
-        this.previousUpdateClientLoopTick = Date.now();
+        this.observers = [];
+        this.running = false;
+        this.countdownStarted = false;
 
         this.previousPhysics = 0;
         this.lagPhysics = 0;
 
+        this.lagUpdate = 0;
+        this.previousUpdate = 0;
+        this.inputBuffer = new Map();
+
+        this.initializeNetworking();
+        this.sendNewMatchNotification();
+
+        this.stateHistory = new Map();
+        //this.sendStateStep();
+
+        this.startLoop();
+    }
+
+    sendStateStep(){
+        this.sockets.forEach(socket => {
+            socket.emit('packet', {
+                action: 'serverStep',
+                step: this.state.step
+            });
+        });
+    }
+
+    initializeNetworking() {
+        this.players.forEach(player => {
+            let socket = this.getSocket(player.number);
+            socket.on('packet', packet => {
+                switch (packet.action) {
+                    case "input":
+                        this.packets.push(packet);
+                        console.log('[RECEIVED] ->', this.state.step);
+                        break;
+                    case "ready":
+                        if (!this.countdownStarted) {
+                            this.startCountdown();
+                        }
+                        break;
+                    // case 'clientStep':
+                    //     socket.emit('packet', {
+                    //         action: 'roundTrip',
+                    //         roundTrip: (this.state.step - packet.step)
+                    //     });
+                    //     break;
+                }
+            });
+        });
     }
 
     getSocket(number) {
@@ -68,7 +103,8 @@ class ServerController {
     sendNewMatchNotification() {
 
         this.players.forEach(player => {
-            this.getSocket(player.number).emit('newMatch', {
+            this.getSocket(player.number).emit('packet', {
+                action: 'newGame',
                 state: this.state,
                 sent: Date.now()
             });
@@ -93,8 +129,8 @@ class ServerController {
         setTimeout(() => {
             this.players.forEach(player => {
                 this.getSocket(player.number).emit('countdown', 0);
+                this.running = true;
             });
-            this.matchStarted = true;
         }, 3000);
         setTimeout(() => {
             this.players.forEach(player => {
@@ -111,8 +147,10 @@ class ServerController {
     }
 
     sendUpdates() {
+        console.log('[SERVER STEP] ->', this.state.step);
         this.sockets.forEach(socket => {
-            socket.emit('updateState', {
+            socket.emit('packet', {
+                action: 'serverUpdate',
                 state: this.state,
                 sent: Date.now()
             });
@@ -120,16 +158,20 @@ class ServerController {
     }
 
     updateClientLoop() {
+        setImmediate(this.updateClientLoop.bind(this));
         let now = Date.now();
-        if (this.previousUpdateClientLoopTick + CLIENT_TICK_DURATION <= now) {
-            this.previousUpdateClientLoopTick = now;
-            this.sendUpdates();
+        let delta = now - this.previousUpdate;
+        if (delta > 1000) {
+            delta = CLIENT_TICK_DURATION;
         }
-        if (Date.now() - this.previousUpdateClientLoopTick < CLIENT_TICK_DURATION - 16) {
-            setTimeout(() => this.updateClientLoop());
-        } else {
-            setImmediate(() => this.updateClientLoop());
+        this.lagUpdate += delta;
+        if (this.lagUpdate >= CLIENT_TICK_DURATION) {
+            if (this.running){
+                this.sendUpdates();
+            }
+            this.lagUpdate -= CLIENT_TICK_DURATION;
         }
+        this.previousUpdate = now;
     }
 
     physicsLoop() {
@@ -141,12 +183,12 @@ class ServerController {
         }
         this.lagPhysics += delta;
         if (this.lagPhysics >= SERVER_TICK_DURATION) {
-            if (this.matchStarted) {
-                this.updatePhysics();
-                //this.handleInputs();
+            if (this.running){
+                this.handleInputs();
+                this.updatePhysics(this.state);
                 this.notifyObservers(delta);
-                this.state.serverStep++;
             }
+            this.stateHistory.set(this.state.step, this.state.copy());
             this.lagPhysics -= SERVER_TICK_DURATION;
         }
         this.previousPhysics = now;
@@ -156,17 +198,32 @@ class ServerController {
         this.observers.push(observer);
     }
 
-    updatePhysics() {
-        this.updatePlayers();
-        this.updatePipes();
+    updatePhysics(state) {
+        this.updatePlayers(state);
+        this.updatePipes(state);
+        state.step++;
         //this.checkCollision();
     }
 
     handleInputs() {
         this.packets.forEach(packet => {
-            let player = this.getPlayer(packet.id);
-            console.log(packet);
-            player.pig.vy = PIG_SPEED;
+            console.log('[INPUT APPLIED] ->', this.state.step);
+            let deltaStep = this.state.step - packet.step;
+            console.log('[REWINDING] ->', deltaStep, 'steps');
+
+            let oldState = this.state.copy();
+            if (deltaStep > 0){
+                oldState = this.stateHistory.get(packet.step).copy();
+            }
+            let player = oldState.players.find(player => player.number === packet.id);
+            player.pig.applyInput();
+
+            for (let i = 0; i < deltaStep; i++) {
+                player.pig.updatePig();
+            }
+            let updatedPlayer = this.state.players.find(player => player.number === packet.id);
+            updatedPlayer.pig = player.pig;
+            updatedPlayer.sequenceNumber = packet.sequenceNumber;
         });
         this.packets = [];
     }
@@ -177,12 +234,12 @@ class ServerController {
 
     stopLoop() {
         clearInterval(this.updateClientLoop);
-        //gameloop.clearGameLoop(this.loop);
+        clearInterval(this.physicsLoop)
     }
 
     //updates pig positions
-    updatePlayers(delta) {
-        this.players.forEach(player => player.pig.update(delta))
+    updatePlayers(state) {
+        state.players.forEach(player => player.pig.updatePig())
     }
 
     checkCollision() {
@@ -247,12 +304,12 @@ class ServerController {
     }
 
 
-    updatePipes() {
-        for (let i = this.pipes.length - 1; i >= 0; i--) {
-            let pipe = this.pipes[i];
+    updatePipes(state) {
+        for (let i = state.pipes.length - 1; i >= 0; i--) {
+            let pipe = state.pipes[i];
             pipe.update();
             if (pipe.x + pipe.width < 0) {
-                this.pipes.shift();
+                state.pipes.shift();
             }
         }
     }

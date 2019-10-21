@@ -4,9 +4,14 @@ class ServerClient {
     constructor(number) {
         this.pig = new ServerPig();
         this.number = number;
+        this.sequenceNumber = -1;
+    }
 
-        this.pings = [];
-        this.ping = null;
+    copy(){
+        let copy = new ServerClient(this.number);
+        copy.pig = this.pig.copy();
+        copy.sequenceNumber = this.sequenceNumber;
+        return copy;
     }
 
 

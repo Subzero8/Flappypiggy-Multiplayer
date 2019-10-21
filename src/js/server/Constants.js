@@ -10,11 +10,11 @@ const GAME_WIDTH = 1600;
 
 const GRAVITY = 2;
 const PIG_SPEED = -20;
-const PIPE_SPEED = -10;
 const PIG_MAX_SPEED = 10;
+const PIPE_SPEED = -10;
 //can't change
 const SERVER_TICKRATE = 60;
-const CLIENT_TICKRATE = 20;
+const CLIENT_TICKRATE = 1;
 
 const SERVER_TICK_DURATION = 1000 / SERVER_TICKRATE; //in ms
 const CLIENT_TICK_DURATION = 1000 / CLIENT_TICKRATE; //in ms
