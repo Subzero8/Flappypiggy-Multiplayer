@@ -7,17 +7,17 @@ class ClientController {
         this.running = false;
 
         this.inputHistory = new Map();
-        this.clientStep = 0;
         this.sequenceNumber = -1;
 
         this.running = false;
+        this.loopRunning = false;
 
         //for physics loop
         this.previousPhysics = 0;
         this.lagPhysics = 0;
         //for ping calculation
         this.pings = [];
-
+        this.statesHistory = [];
         this.initializeNetworking();
     }
 
@@ -62,7 +62,6 @@ class ClientController {
 
     onNewMatch(packet) {
         console.log("[MATCH FOUND]");
-        this.startLoop();
         this.currentState = packet.state;
         this.setListeners();
         //initialize Scene
@@ -84,11 +83,18 @@ class ClientController {
 
             }
         });
+        this.socket.on('disconnect', () => {
+            console.log('user disconnected');
+            this.loopRunning = false;
+        });
+        this.startLoop();
 
     }
 
     physicsLoop() {
-        requestAnimationFrame(this.physicsLoop.bind(this));
+        if (this.loopRunning) {
+            requestAnimationFrame(this.physicsLoop.bind(this));
+        }
         let now = Date.now();
         let delta = now - this.previousPhysics;
         if (delta > 1000) {
@@ -107,11 +113,15 @@ class ClientController {
 
     startLoop() {
         this.startTime = Date.now();
-        this.gameLoop();
-        this.physicsLoop();
+        this.loopRunning = true;
+        requestAnimationFrame(this.gameLoop.bind(this));
+        requestAnimationFrame(this.physicsLoop.bind(this));
     }
 
     gameLoop(time) {
+        if (this.loopRunning) {
+            requestAnimationFrame(this.gameLoop.bind(this));
+        }
         let delta = 0;
         let currentFrame;
         if (this.startTime === undefined) {
@@ -127,16 +137,14 @@ class ClientController {
             }
         }
 
-        requestAnimationFrame(this.gameLoop.bind(this));
     }
 
     applyInput(state) {
         let localPlayer = state.players.find(player => player.number === this.id);
         if (this.pendingInputs.length > 0) {
             localPlayer.pig.vy = PIG_SPEED;
-            console.log('[INPUT APPLIED] ->', this.clientStep);
-            this.inputHistory.set(this.sequenceNumber, this.clientStep);
-            this.sequenceNumber++;
+            console.log('[INPUT APPLIED] ->', this.currentState.step);
+            this.inputHistory.set(this.sequenceNumber, this.currentState.step);
         }
     }
 
@@ -149,12 +157,13 @@ class ClientController {
             this.socket.emit('packet', {
                 action: 'input',
                 id: this.id,
-                step: this.clientStep,
+                step: this.currentState.step,
                 sequenceNumber: this.sequenceNumber,
                 data: this.pendingInputs
             });
+            this.sequenceNumber++;
+            this.pendingInputs = [];
         }
-        this.pendingInputs = [];
     }
 
     updateGame(state) {
@@ -166,7 +175,7 @@ class ClientController {
             if (player.pig.y >= GAME_HEIGHT) {
                 player.pig.y = GAME_HEIGHT
             }
-            if (player.pig.vy + GRAVITY < PIG_MAX_SPEED) {
+            if (player.pig.vy + GRAVITY <= PIG_MAX_SPEED) {
                 player.pig.vy += GRAVITY;
             }
         })
@@ -196,14 +205,15 @@ class ClientController {
         });
     }
 
-
     serverReconciliation() {
         this.discardProcessedInputs();
-        this.blabla();
+        this.checkUnprocessedInputs();
+        this.checkServerBehindClient();
     }
 
     discardProcessedInputs() {
         let lastProcessedInputSequenceNumber = this.getPlayer(this.serverState).sequenceNumber;
+
         for (let sequenceNumber of this.inputHistory.keys()) {
             if (sequenceNumber <= lastProcessedInputSequenceNumber)
                 this.inputHistory.delete(sequenceNumber);
@@ -256,27 +266,39 @@ class ClientController {
         this.scene.render(this.currentState);
     }
 
-    blabla() {
-        let newState = this.getCopy(this.serverState);
-        //console.log('deltaStep: ', deltaStep);
-        let serverStep = this.serverState.step;
+    checkServerBehindClient() {
+        //if client ahead of server, simulate
+        let deltaStep = this.currentState.step - this.serverState.step;
+        if (deltaStep > 0) {
+            console.log(deltaStep);
+            this.simulateGame(this.serverState, deltaStep);
+        }
+    }
 
+    checkUnprocessedInputs() {
+
+        //check for unprocessed input from server
         for (let sequenceNumber of this.inputHistory.keys()) {
             console.log('SEQUENCENUMBER', sequenceNumber);
+            let oldStep = this.inputHistory.get(sequenceNumber);
+            let deltaStep = this.currentState.step - oldStep;
+
+            let oldState = this.statesHistory.find(state => state.step === oldStep);
+            this.simulateGame(oldState, deltaStep);
         }
-        let serverPig = this.getPlayer(this.serverState).pig;
 
-        let clientPig = this.getPlayer(this.currentState).pig;
-        console.log('server_y=', serverPig.y, 'client_y=', clientPig.y, 'deltaStep=', this.clientStep - serverStep, 'inputs lefts=', this.inputHistory.size);
+        console.log(this.serverState);
+        console.log(this.currentState);
 
-        this.currentState = this.getCopy(newState);
-        this.clientStep = this.currentState.step;
+        this.currentState.pipes = this.serverState.pipes;
     }
 
 
     updatePhysics() {
         this.updateGame(this.currentState);
-        this.clientStep++;
+        this.currentState.step++;
+        this.statesHistory.push(this.getCopy(this.currentState));
+        this.statesHistory = this.statesHistory.filter(state => state.step >= this.currentState.step - 60)
     }
 
     calculatePing() {
@@ -300,9 +322,9 @@ class ClientController {
 
     }
 
-    simulateGame(nbTicks){
+    simulateGame(state, nbTicks) {
         for (let i = 0; i < nbTicks; i++) {
-            this.updateGame(this.currentState)
+            this.updateGame(state);
         }
     }
 }

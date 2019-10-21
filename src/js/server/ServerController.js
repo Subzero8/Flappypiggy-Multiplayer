@@ -12,6 +12,7 @@ const {GAME_HEIGHT} = require('./Constants');
 
 
 class ServerController {
+
     constructor(sockets) {
         //Players
         this.players = [];
@@ -39,6 +40,7 @@ class ServerController {
 
         this.observers = [];
         this.running = false;
+        this.loopRunning = false;
         this.countdownStarted = false;
 
         this.previousPhysics = 0;
@@ -142,12 +144,15 @@ class ServerController {
     startLoop() {
         this.addObserver(new PipeLoopObserver(this));
         //this.addObserver(new ClientUpdateLoopObserver(this));
+
+        this.loopRunning = true;
         this.updateClientLoop();
         this.physicsLoop();
     }
 
     sendUpdates() {
         console.log('[SERVER STEP] ->', this.state.step);
+        console.log(this.state.players);
         this.sockets.forEach(socket => {
             socket.emit('packet', {
                 action: 'serverUpdate',
@@ -158,7 +163,9 @@ class ServerController {
     }
 
     updateClientLoop() {
-        setImmediate(this.updateClientLoop.bind(this));
+        if (this.loopRunning) {
+            setImmediate(this.updateClientLoop.bind(this));
+        }
         let now = Date.now();
         let delta = now - this.previousUpdate;
         if (delta > 1000) {
@@ -175,7 +182,9 @@ class ServerController {
     }
 
     physicsLoop() {
-        setImmediate(this.physicsLoop.bind(this));
+        if (this.loopRunning) {
+            setImmediate(this.physicsLoop.bind(this));
+        }
         let now = Date.now();
         let delta = now - this.previousPhysics;
         if (delta > 1000) {
@@ -187,8 +196,8 @@ class ServerController {
                 this.handleInputs();
                 this.updatePhysics(this.state);
                 this.notifyObservers(delta);
+                this.stateHistory.set(this.state.step, this.state.copy());
             }
-            this.stateHistory.set(this.state.step, this.state.copy());
             this.lagPhysics -= SERVER_TICK_DURATION;
         }
         this.previousPhysics = now;
@@ -233,8 +242,7 @@ class ServerController {
     }
 
     stopLoop() {
-        clearInterval(this.updateClientLoop);
-        clearInterval(this.physicsLoop)
+        this.loopRunning = false;
     }
 
     //updates pig positions

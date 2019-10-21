@@ -60,3 +60,7 @@ function printAvailableSocket(socket) {
 function notEmpty(array) {
     return array.length > 0;
 }
+
+io.on('close', function () {
+    console.log('CLOSED');
+});
