@@ -6,6 +6,8 @@ class ClientController {
         this.pendingInputs = [];
         this.running = false;
 
+        //local id
+        this.id = null;
         this.inputHistory = new Map();
         this.sequenceNumber = -1;
 
@@ -15,10 +17,20 @@ class ClientController {
         //for physics loop
         this.previousPhysics = 0;
         this.lagPhysics = 0;
+
+        this.lastRenderFrame = Date.now();
         //for ping calculation
         this.pings = [];
         this.statesHistory = [];
         this.initializeNetworking();
+
+        this.countedFrames = 0;
+        //state for rendering
+        this.renderingState = null;
+        //current game state physic wise
+        this.currentState = null;
+        //server state received
+        this.serverState = null;
     }
 
     initializeNetworking() {
@@ -98,15 +110,15 @@ class ClientController {
         let now = Date.now();
         let delta = now - this.previousPhysics;
         if (delta > 1000) {
-            delta = SERVER_TICK_DURATION;
+            delta = PHYSICS_TICK_DURATION;
         }
         this.lagPhysics += delta;
-        if (this.lagPhysics >= SERVER_TICK_DURATION) {
+        if (this.lagPhysics >= PHYSICS_TICK_DURATION) {
             this.sendInputsToServer();
             if (this.running) {
                 this.updatePhysics();
             }
-            this.lagPhysics -= SERVER_TICK_DURATION;
+            this.lagPhysics -= PHYSICS_TICK_DURATION;
         }
         this.previousPhysics = now;
     }
@@ -114,29 +126,64 @@ class ClientController {
     startLoop() {
         this.startTime = Date.now();
         this.loopRunning = true;
-        requestAnimationFrame(this.gameLoop.bind(this));
+        requestAnimationFrame(this.renderingLoop.bind(this));
         requestAnimationFrame(this.physicsLoop.bind(this));
     }
 
-    gameLoop(time) {
-        if (this.loopRunning) {
-            requestAnimationFrame(this.gameLoop.bind(this));
-        }
-        let delta = 0;
-        let currentFrame;
-        if (this.startTime === undefined) {
-            this.startTime = time;
-        } else {
-            currentFrame = Math.round((time - this.startTime) / UPDATE_FRAME_TIME);
-            delta = (currentFrame - this.lastFrame) * UPDATE_FRAME_TIME;
-        }
-        this.lastFrame = currentFrame;
-        if (delta >= UPDATE_FRAME_TIME) {
-            if (this.running) {
-                this.render();
-            }
-        }
+    renderingLoop(time) {
 
+        // let delta = 0;
+        // let currentFrame;
+        // if (this.startTime === undefined) {
+        //     this.startTime = time;
+        // } else {
+        //     currentFrame = Math.round((time - this.startTime) / UPDATE_FRAME_TIME);
+        //     delta = (currentFrame - this.lastFrame) * UPDATE_FRAME_TIME;
+        // }
+        // this.lastFrame = currentFrame;
+        // if (delta >= UPDATE_FRAME_TIME) {
+        //     console.log(delta);
+        //     this.render();
+        //     this.avgFPS = this.countedFrames / ( Date.now() - this.startTime);
+        //     if(this.avgFPS > 2000000 )
+        //     {
+        //         this.avgFPS = 0;
+        //     }
+        //     this.countedFrames++;
+        //     console.log(this.avgFPS);
+        // }
+        if (this.loopRunning) {
+            requestAnimationFrame(this.renderingLoop.bind(this));
+        }
+        if (this.running) {
+            this.renderScene();
+            this.avgFPS = this.countedFrames / (Date.now() - this.startTime);
+            if (this.avgFPS > 1000) {
+                this.avgFPS = 0;
+            }
+            this.countedFrames++;
+            this.scene.setFPS(this.avgFPS * 1000);
+        }
+    }
+
+    renderScene() {
+        let now = Date.now();
+        //time since last render
+        let deltaTime = now - this.lastRenderFrame;
+        //extrapolate it
+        this.renderingState = this.getCopy(this.currentState);
+        this.extrapolateState(this.renderingState, deltaTime);
+        //render it
+        this.scene.render(this.renderingState);
+
+        this.lastRenderFrame = Date.now();
+    }
+
+    extrapolateState(state, deltaTime) {
+        //of how much do we want to update the game ?
+        let stepsToExtrapolate = deltaTime / PHYSICS_TICK_DURATION;
+
+        return this.updateGame(state, stepsToExtrapolate);
     }
 
     applyInput(state) {
@@ -166,17 +213,17 @@ class ClientController {
         }
     }
 
-    updateGame(state) {
+    updateGame(state, step) {
         state.pipes.forEach(pipe => {
-            pipe.x += PIPE_SPEED;
+            pipe.x += PIPE_SPEED * step;
         });
         state.players.forEach(player => {
-            player.pig.y += player.pig.vy;
+            player.pig.y += player.pig.vy * step;
             if (player.pig.y >= GAME_HEIGHT) {
                 player.pig.y = GAME_HEIGHT
             }
             if (player.pig.vy + GRAVITY <= PIG_MAX_SPEED) {
-                player.pig.vy += GRAVITY;
+                player.pig.vy += GRAVITY * step;
             }
         })
     }
@@ -261,16 +308,10 @@ class ClientController {
         return start * (1 - time) + end * time;
     }
 
-
-    render() {
-        this.scene.render(this.currentState);
-    }
-
     checkServerBehindClient() {
         //if client ahead of server, simulate
         let deltaStep = this.currentState.step - this.serverState.step;
         if (deltaStep > 0) {
-            console.log(deltaStep);
             this.simulateGame(this.serverState, deltaStep);
         }
     }
@@ -287,18 +328,23 @@ class ClientController {
             this.simulateGame(oldState, deltaStep);
         }
 
-        console.log(this.serverState);
-        console.log(this.currentState);
-
         this.currentState.pipes = this.serverState.pipes;
+        for (let i = 0; i < this.currentState.players.length; i++) {
+            if (this.currentState.players[i].number !== this.id) {
+                this.currentState.players[i] = this.serverState.players[i];
+            }
+        }
     }
 
 
     updatePhysics() {
-        this.updateGame(this.currentState);
+        this.updateGame(this.currentState, 1);
         this.currentState.step++;
+        //add the state to our history for later reconciliation
         this.statesHistory.push(this.getCopy(this.currentState));
-        this.statesHistory = this.statesHistory.filter(state => state.step >= this.currentState.step - 60)
+        this.statesHistory = this.statesHistory.filter(state => state.step >= this.currentState.step - 60);
+
+        this.renderingState = this.getCopy(this.currentState);
     }
 
     calculatePing() {
@@ -324,7 +370,7 @@ class ClientController {
 
     simulateGame(state, nbTicks) {
         for (let i = 0; i < nbTicks; i++) {
-            this.updateGame(state);
+            this.updateGame(state, 1);
         }
     }
 }

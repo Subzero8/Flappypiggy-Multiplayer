@@ -1,14 +1,4 @@
-
-
-
-let playerNumber;
-
-let scene;
 let textures;
-let pipesData;
-
-
-
 //Aliases
 let Application = PIXI.Application,
     Container = PIXI.Container,

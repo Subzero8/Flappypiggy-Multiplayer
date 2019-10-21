@@ -152,7 +152,6 @@ class ServerController {
 
     sendUpdates() {
         console.log('[SERVER STEP] ->', this.state.step);
-        console.log(this.state.players);
         this.sockets.forEach(socket => {
             socket.emit('packet', {
                 action: 'serverUpdate',

@@ -8,6 +8,7 @@ class Scene {
         this.initializeScore();
         this.initializeAnnoncer();
         this.initializePingDisplay();
+        this.initializeFPSDisplay();
     }
 
     render(state) {
@@ -94,11 +95,11 @@ class Scene {
         console.log('lost');
         this.displayMessage(this.annoncer, 'You lost');
     }
+
     win() {
         console.log('win');
-        this.displayMessage(this.annoncer,'You won');
+        this.displayMessage(this.annoncer, 'You won');
     }
-
 
 
     initializeAnnoncer() {
@@ -149,7 +150,25 @@ class Scene {
         this.ping.y = window.innerHeight * 0.01;
         this.app.stage.addChild(this.ping);
     }
-    setPing(value){
+
+    initializeFPSDisplay() {
+        let style = new PIXI.TextStyle({
+            fontFamily: "Futura",
+            fontSize: 30 * this.app.renderer.width / this.app.renderer.resolution / GAME_WIDTH,
+            fill: "white"
+        });
+        this.fps = new PIXI.Text("FPS : 0", style);
+
+        this.fps.x = window.innerWidth * 0.2;
+        this.fps.y = window.innerHeight * 0.01;
+        this.app.stage.addChild(this.fps);
+    }
+
+    setPing(value) {
         this.ping.text = "Ping : " + value;
+    }
+
+    setFPS(value) {
+        this.fps.text = "FPS : " + Math.round(value);
     }
 }
