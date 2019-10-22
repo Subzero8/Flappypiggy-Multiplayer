@@ -162,7 +162,8 @@ class ClientController {
             }
             this.countedFrames++;
             this.scene.setFPS(this.avgFPS * 1000);
-            if (Date.now() - this.startTime >= 500) {
+            if (Date.now() - this.startTime >= 1000) {
+
                 this.startTime = Date.now();
                 this.countedFrames = 0;
             }
@@ -297,16 +298,18 @@ class ClientController {
     }
 
     serverReconciliation() {
+        console.log(this.currentState);
+        console.log(this.serverState);
         this.discardProcessedInputs();
         this.checkUnprocessedInputs();
         this.checkServerBehindClient();
 
         this.currentState.pipes = this.serverState.pipes;
-        for (let i = 0; i < this.currentState.players.length; i++) {
-            if (this.currentState.players[i].number !== this.id) {
-                this.currentState.players[i] = this.serverState.players[i];
-            }
-        }
+        // for (let i = 0; i < this.currentState.players.length; i++) {
+        //         //     if (this.currentState.players[i].number !== this.id) {
+        //         //         this.currentState.players[i] = this.serverState.players[i];
+        //         //     }
+        //         // }
     }
 
     discardProcessedInputs() {
@@ -332,17 +335,15 @@ class ClientController {
         for (let sequenceNumber of this.inputHistory.keys()) {
             console.log('SEQUENCENUMBER', sequenceNumber);
             let oldStep = this.inputHistory.get(sequenceNumber);
-            let deltaStep = this.currentState.step - oldStep;
+            let deltaStep = this.serverState.step - oldStep;
 
-            oldState = this.statesHistory.find(state => state.step === oldStep);
+            oldState = this.getCopy(this.statesHistory.find(state => state.step === oldStep));
             this.simulateGame(oldState, deltaStep);
-
+            this.applyInput(oldState);
         }
         if (oldState) {
-            console.log(this.currentState);
             console.log(oldState);
-            this.getPlayer(this.currentState).pig.y = this.getPlayer(oldState).pig.y;
-            this.getPlayer(this.currentState).sequenceNumber = this.getPlayer(oldState).sequenceNumber;
+            this.serverState = this.getCopy(oldState)
         }
     }
 
