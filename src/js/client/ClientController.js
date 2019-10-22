@@ -85,7 +85,7 @@ class ClientController {
         this.serverReconciliation();
         this.pings.push({
             received: Date.now(),
-            delay: this.currentState.step - packet.state.step
+            delay: Date.now() - packet.sent
         });
         this.scene.setPing(this.calculatePing());
     }
@@ -156,12 +156,7 @@ class ClientController {
         }
         if (this.running) {
             this.updateRender();
-            this.avgFPS = this.countedFrames / (Date.now() - this.startTime);
-            if (this.avgFPS > 200000) {
-                this.avgFPS = 0;
-            }
-            this.countedFrames++;
-            this.scene.setFPS(this.avgFPS * 1000);
+
         }
     }
 
@@ -203,6 +198,12 @@ class ClientController {
         //render it
         this.scene.render(this.renderingState);
 
+        this.avgFPS = this.countedFrames / (Date.now() - this.startTime);
+        if (this.avgFPS > 200000) {
+            this.avgFPS = 0;
+        }
+        this.countedFrames++;
+        this.scene.setFPS(this.avgFPS * 1000);
         this.lastRenderFrame = Date.now();
     }
 
@@ -284,7 +285,9 @@ class ClientController {
 
         window.addEventListener('touchstart', () => {
             if (!this.running) {
-                this.socket.emit('ready');
+                this.socket.emit('packet', {
+                    action: 'ready'
+                });
             } else {
                 this.pendingInputs.push('jump');
                 this.applyInput(this.currentState);
@@ -362,8 +365,7 @@ class ClientController {
     sum(array) {
         let counter = 0;
         for (let i = 0; i < array.length; i++) {
-            console.log(array[i].delay * PHYSICS_TICK_DURATION);
-            counter += array[i].delay * PHYSICS_TICK_DURATION;
+            counter += array[i].delay;
         }
         return counter;
     }
