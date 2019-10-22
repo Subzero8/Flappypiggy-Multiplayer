@@ -14,11 +14,10 @@ const PIPE_SPEED = -10;
 const PIG_MAX_SPEED = 10;
 //can't change
 const PHYSICS_TICKRATE = 60;
-const CLIENT_TICKRATE = 20;
+const CLIENT_TICKRATE = 10;
 
 const PHYSICS_TICK_DURATION = 1000 / PHYSICS_TICKRATE; //in ms
 
-const INTERPOLATION_PERIOD = 1000/CLIENT_TICKRATE * 2;
 
 //client constants
 const RENDER_TICK_RATE = 60;

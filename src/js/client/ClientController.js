@@ -31,6 +31,8 @@ class ClientController {
         this.currentState = null;
         //server state received
         this.serverState = null;
+
+        this.positionsHistory = new Map();
     }
 
     initializeNetworking() {
@@ -63,19 +65,36 @@ class ClientController {
     }
 
     onServerUpdate(packet) {
+        console.log('[SERVER UPDATE]');
         this.serverState = this.getCopy(packet.state);
+        this.serverState.players.forEach(player => {
+            if (player.number !== this.id) {
+                //If no buffer exist, create it
+                if (!this.positionsHistory.get(player.number)) {
+                    this.positionsHistory.set(player.number, []);
+                }
+                let positionHistory = this.positionsHistory.get(player.number);
+                // Add it to the position buffer.
+                positionHistory.push({
+                    step: this.serverState.step,
+                    position: player.pig.y
+                });
+            }
+        });
+
+        this.serverReconciliation();
         this.pings.push({
             received: Date.now(),
             delay: Date.now() - packet.sent
         });
-        this.serverReconciliation();
         this.scene.setPing(this.calculatePing());
     }
 
     onNewMatch(packet) {
         console.log("[MATCH FOUND]");
-        this.currentState = packet.state;
-        this.setListeners();
+        this.currentState = this.getCopy(packet.state);
+        this.renderingState = this.getCopy(packet.state);
+        this.onServerUpdate(packet);
         //initialize Scene
         this.scene.initialize(this.currentState, this.id);
         this.scene.displayMessage(this.scene.annoncer, 'Match Found !');
@@ -99,6 +118,7 @@ class ClientController {
             console.log('user disconnected');
             this.loopRunning = false;
         });
+        this.setListeners();
         this.startLoop();
 
     }
@@ -130,48 +150,59 @@ class ClientController {
         requestAnimationFrame(this.physicsLoop.bind(this));
     }
 
-    renderingLoop(time) {
-
-        // let delta = 0;
-        // let currentFrame;
-        // if (this.startTime === undefined) {
-        //     this.startTime = time;
-        // } else {
-        //     currentFrame = Math.round((time - this.startTime) / UPDATE_FRAME_TIME);
-        //     delta = (currentFrame - this.lastFrame) * UPDATE_FRAME_TIME;
-        // }
-        // this.lastFrame = currentFrame;
-        // if (delta >= UPDATE_FRAME_TIME) {
-        //     console.log(delta);
-        //     this.render();
-        //     this.avgFPS = this.countedFrames / ( Date.now() - this.startTime);
-        //     if(this.avgFPS > 2000000 )
-        //     {
-        //         this.avgFPS = 0;
-        //     }
-        //     this.countedFrames++;
-        //     console.log(this.avgFPS);
-        // }
+    renderingLoop() {
         if (this.loopRunning) {
             requestAnimationFrame(this.renderingLoop.bind(this));
         }
         if (this.running) {
-            this.renderScene();
+            this.updateRender();
             this.avgFPS = this.countedFrames / (Date.now() - this.startTime);
-            if (this.avgFPS > 1000) {
+            if (this.avgFPS > 200000) {
                 this.avgFPS = 0;
             }
             this.countedFrames++;
             this.scene.setFPS(this.avgFPS * 1000);
+            if (Date.now() - this.startTime >= 500) {
+                this.startTime = Date.now();
+                this.countedFrames = 0;
+            }
         }
     }
 
-    renderScene() {
+    interpolateEntities() {
+        let render_step = this.renderingState.step - PHYSICS_TICKRATE / CLIENT_TICKRATE;
+        //console.log(this.renderingState.step);
+        this.renderingState.players.forEach(player => {
+            if (player.number !== this.id) {
+                let positionHistory = this.positionsHistory.get(player.number);
+                // Drop older positions.
+
+                while (positionHistory.length >= 2 && positionHistory[1].step <= render_step) {
+                    positionHistory.shift();
+                }
+                let positionHistoryA = positionHistory[0];
+                let positionHistoryB = positionHistory[1];
+
+                // Interpolate between the two surrounding authoritative positions.
+                if (positionHistory.length >= 2 && positionHistoryA.step <= render_step && render_step <= positionHistoryB.step) {
+                    let y0 = positionHistoryA.position;
+                    let y1 = positionHistoryB.position;
+                    let t0 = positionHistoryA.step;
+                    let t1 = positionHistoryB.step;
+
+                    player.pig.y = y0 + (y1 - y0) * (render_step - t0) / (t1 - t0);
+                }
+            }
+
+        });
+    }
+
+    updateRender() {
         let now = Date.now();
         //time since last render
         let deltaTime = now - this.lastRenderFrame;
         //extrapolate it
-        this.renderingState = this.getCopy(this.currentState);
+        this.interpolateEntities();
         this.extrapolateState(this.renderingState, deltaTime);
         //render it
         this.scene.render(this.renderingState);
@@ -182,8 +213,7 @@ class ClientController {
     extrapolateState(state, deltaTime) {
         //of how much do we want to update the game ?
         let stepsToExtrapolate = deltaTime / PHYSICS_TICK_DURATION;
-
-        return this.updateGame(state, stepsToExtrapolate);
+        return this.simulatePhysics(state, stepsToExtrapolate);
     }
 
     applyInput(state) {
@@ -213,25 +243,39 @@ class ClientController {
         }
     }
 
-    updateGame(state, step) {
+    simulatePhysics(state, step) {
         state.pipes.forEach(pipe => {
             pipe.x += PIPE_SPEED * step;
         });
         state.players.forEach(player => {
-            player.pig.y += player.pig.vy * step;
-            if (player.pig.y >= GAME_HEIGHT) {
-                player.pig.y = GAME_HEIGHT
+            if (player.number === this.id) {
+                player.pig.y += player.pig.vy * step;
+                if (player.pig.y >= GAME_HEIGHT) {
+                    player.pig.y = GAME_HEIGHT
+                }
+                if (player.pig.vy + GRAVITY <= PIG_MAX_SPEED) {
+                    player.pig.vy += GRAVITY * step;
+                }
             }
-            if (player.pig.vy + GRAVITY <= PIG_MAX_SPEED) {
-                player.pig.vy += GRAVITY * step;
-            }
-        })
+        });
+        state.step += step;
     }
 
 
     setListeners() {
         let z = new KeyListener('z');
         z.press = () => {
+            if (!this.running) {
+                this.socket.emit('packet', {
+                    action: 'ready'
+                });
+            } else {
+                this.pendingInputs.push('jump');
+                this.applyInput(this.currentState);
+            }
+        };
+        let Z = new KeyListener('Z');
+        Z.press = () => {
             if (!this.running) {
                 this.socket.emit('packet', {
                     action: 'ready'
@@ -256,6 +300,13 @@ class ClientController {
         this.discardProcessedInputs();
         this.checkUnprocessedInputs();
         this.checkServerBehindClient();
+
+        this.currentState.pipes = this.serverState.pipes;
+        for (let i = 0; i < this.currentState.players.length; i++) {
+            if (this.currentState.players[i].number !== this.id) {
+                this.currentState.players[i] = this.serverState.players[i];
+            }
+        }
     }
 
     discardProcessedInputs() {
@@ -267,47 +318,6 @@ class ClientController {
         }
     }
 
-    correctActorsPosition() {
-        this.lastState = this.getCopy(this.currentState);
-        this.currentState = this.getCopy(this.serverState);
-        if (this.timeSinceLastServerSnapshot <= INTERPOLATION_PERIOD) {
-            this.currentState.pipes.forEach(pipe => {
-                let lastPipe = this.lastState.pipes.find(p => p.number === pipe.number);
-                let serverPipe = this.currentState.pipes.find(p => p.number === pipe.number);
-                if (lastPipe) {
-                    pipe.x = this.lerp(lastPipe.x, serverPipe.x, this.timeSinceLastServerSnapshot / INTERPOLATION_PERIOD);
-                } else {
-                    pipe.x = serverPipe.x;
-                }
-            });
-            /*this.currentState.players.forEach(player => {
-                let lastStatePig = this.lastState.players.find(p => p.number === player.number).pig;
-                let serverPig = this.currentState.players.find(p => p.number === player.number).pig;
-                if (lastStatePig) {
-                    player.pig.y = this.lerp(lastStatePig.y, serverPig.y, this.timeSinceLastServerSnapshot / INTERPOLATION_PERIOD);
-                } else {
-                    player.pig.y = serverPig.y;
-                }
-            })*/
-        } else {
-            this.currentState.pipes.forEach(pipe => {
-                let serverPipe = this.currentState.pipes.find(p => p.number === pipe.number);
-                pipe.x = serverPipe.x
-            })
-            // this.currentState.players.forEach(player => {
-            //     let serverPig = this.currentState.players.find(p => p.number == player.number).pig;
-            //     player.pig.y = serverPig.y;
-            //
-            // })
-        }
-
-
-    }
-
-    lerp(start, end, time) {
-        return start * (1 - time) + end * time;
-    }
-
     checkServerBehindClient() {
         //if client ahead of server, simulate
         let deltaStep = this.currentState.step - this.serverState.step;
@@ -317,34 +327,35 @@ class ClientController {
     }
 
     checkUnprocessedInputs() {
-
+        let oldState = null;
         //check for unprocessed input from server
         for (let sequenceNumber of this.inputHistory.keys()) {
             console.log('SEQUENCENUMBER', sequenceNumber);
             let oldStep = this.inputHistory.get(sequenceNumber);
             let deltaStep = this.currentState.step - oldStep;
 
-            let oldState = this.statesHistory.find(state => state.step === oldStep);
+            oldState = this.statesHistory.find(state => state.step === oldStep);
             this.simulateGame(oldState, deltaStep);
-        }
 
-        this.currentState.pipes = this.serverState.pipes;
-        for (let i = 0; i < this.currentState.players.length; i++) {
-            if (this.currentState.players[i].number !== this.id) {
-                this.currentState.players[i] = this.serverState.players[i];
-            }
+        }
+        if (oldState) {
+            console.log(this.currentState);
+            console.log(oldState);
+            this.getPlayer(this.currentState).pig.y = this.getPlayer(oldState).pig.y;
+            this.getPlayer(this.currentState).sequenceNumber = this.getPlayer(oldState).sequenceNumber;
         }
     }
 
 
     updatePhysics() {
-        this.updateGame(this.currentState, 1);
-        this.currentState.step++;
+        this.simulatePhysics(this.currentState, 1);
         //add the state to our history for later reconciliation
         this.statesHistory.push(this.getCopy(this.currentState));
         this.statesHistory = this.statesHistory.filter(state => state.step >= this.currentState.step - 60);
 
-        this.renderingState = this.getCopy(this.currentState);
+        this.renderingState.players.find(player => player.number === this.id).pig = this.getCopy(this.currentState).players.find(player => player.number === this.id).pig;
+        this.renderingState.pipes = this.getCopy(this.currentState).pipes;
+        this.renderingState.step = this.currentState.step;
     }
 
     calculatePing() {
@@ -364,13 +375,10 @@ class ClientController {
         return state.players.find(player => player.number === this.id);
     }
 
-    sendPacket(packet) {
-
-    }
 
     simulateGame(state, nbTicks) {
         for (let i = 0; i < nbTicks; i++) {
-            this.updateGame(state, 1);
+            this.simulatePhysics(state, 1);
         }
     }
 }

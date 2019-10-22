@@ -2,7 +2,7 @@ const ServerClient = require('./ServerClient');
 const PipeLoopObserver = require('./PipeLoopObserver');
 const ServerState = require('./ServerState');
 
-const {SERVER_TICK_DURATION} = require("./Constants");
+const {PHYSICS_TICK_DURATION} = require("./Constants");
 
 const {CLIENT_TICK_DURATION} = require('./Constants');
 
@@ -187,17 +187,17 @@ class ServerController {
         let now = Date.now();
         let delta = now - this.previousPhysics;
         if (delta > 1000) {
-            delta = SERVER_TICK_DURATION;
+            delta = PHYSICS_TICK_DURATION;
         }
         this.lagPhysics += delta;
-        if (this.lagPhysics >= SERVER_TICK_DURATION) {
+        if (this.lagPhysics >= PHYSICS_TICK_DURATION) {
             if (this.running){
                 this.handleInputs();
                 this.updatePhysics(this.state);
                 this.notifyObservers(delta);
                 this.stateHistory.set(this.state.step, this.state.copy());
             }
-            this.lagPhysics -= SERVER_TICK_DURATION;
+            this.lagPhysics -= PHYSICS_TICK_DURATION;
         }
         this.previousPhysics = now;
     }
