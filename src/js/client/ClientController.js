@@ -85,7 +85,7 @@ class ClientController {
         this.serverReconciliation();
         this.pings.push({
             received: Date.now(),
-            delay: Date.now() - packet.sent
+            delay: this.currentState.step - packet.state.step
         });
         this.scene.setPing(this.calculatePing());
     }
@@ -162,11 +162,6 @@ class ClientController {
             }
             this.countedFrames++;
             this.scene.setFPS(this.avgFPS * 1000);
-            if (Date.now() - this.startTime >= 1000) {
-
-                this.startTime = Date.now();
-                this.countedFrames = 0;
-            }
         }
     }
 
@@ -367,7 +362,8 @@ class ClientController {
     sum(array) {
         let counter = 0;
         for (let i = 0; i < array.length; i++) {
-            counter += array[i].delay;
+            console.log(array[i].delay * PHYSICS_TICK_DURATION);
+            counter += array[i].delay * PHYSICS_TICK_DURATION;
         }
         return counter;
     }
