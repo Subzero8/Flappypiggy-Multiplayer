@@ -33,6 +33,12 @@ class ClientController {
         this.serverState = null;
 
         this.positionsHistory = new Map();
+
+        this.ping = null;
+
+        this.lastSendingPacketTimestamp = null;
+
+        this.fpsTimestamps = [];
     }
 
     initializeNetworking() {
@@ -47,18 +53,15 @@ class ClientController {
                 case "id":
                     this.id = packet.id;
                     break;
-                // case "serverStep":
-                //     console.log(packet.step);
+                // case "ping":
+                //     console.log('ping');
                 //     this.socket.emit('packet', {
-                //         action: 'clientStep',
-                //         step: packet.step
+                //         action: 'ping',
                 //     });
                 //     break;
                 // case "roundTrip":
-                //     this.clientStep = Math.round(packet.roundTrip/2 + 1);
-                //     console.log(this.clientStep);
-                //     this.simulateGame(this.clientStep);
-                //     this.render();
+                //     this.ping = this.calculatePing(packet.ping);
+                //     this.scene.setPing(this.ping);
                 //     break;
             }
         });
@@ -81,7 +84,6 @@ class ClientController {
                 });
             }
         });
-
         this.serverReconciliation();
         this.pings.push({
             received: Date.now(),
@@ -144,8 +146,8 @@ class ClientController {
     }
 
     startLoop() {
-        this.startTime = Date.now();
         this.loopRunning = true;
+        this.startTime = Date.now();
         requestAnimationFrame(this.renderingLoop.bind(this));
         requestAnimationFrame(this.physicsLoop.bind(this));
     }
@@ -156,7 +158,6 @@ class ClientController {
         }
         if (this.running) {
             this.updateRender();
-
         }
     }
 
@@ -198,12 +199,11 @@ class ClientController {
         //render it
         this.scene.render(this.renderingState);
 
-        this.avgFPS = this.countedFrames / (Date.now() - this.startTime);
-        if (this.avgFPS > 200000) {
-            this.avgFPS = 0;
-        }
-        this.countedFrames++;
-        this.scene.setFPS(this.avgFPS * 1000);
+        this.fpsTimestamps.push({
+            timestamp: Date.now()
+        });
+        this.fpsTimestamps = this.fpsTimestamps.filter(fpsTimestamp => fpsTimestamp.timestamp >= Date.now() - 1000);
+        this.scene.setFPS(this.fpsTimestamps.length);
         this.lastRenderFrame = Date.now();
     }
 
@@ -258,41 +258,25 @@ class ClientController {
         state.step += step;
     }
 
+    handleInput() {
+        if (!this.running) {
+            this.socket.emit('packet', {
+                action: 'ready'
+            });
+            this.lastSendingPacketTimestamp = Date.now();
+        } else {
+            this.pendingInputs.push('jump');
+            this.applyInput(this.currentState);
+        }
+    }
 
     setListeners() {
         let z = new KeyListener('z');
-        z.press = () => {
-            if (!this.running) {
-                this.socket.emit('packet', {
-                    action: 'ready'
-                });
-            } else {
-                this.pendingInputs.push('jump');
-                this.applyInput(this.currentState);
-            }
-        };
+        z.press = this.handleInput.bind(this);
         let Z = new KeyListener('Z');
-        Z.press = () => {
-            if (!this.running) {
-                this.socket.emit('packet', {
-                    action: 'ready'
-                });
-            } else {
-                this.pendingInputs.push('jump');
-                this.applyInput(this.currentState);
-            }
-        };
+        Z.press = this.handleInput.bind(this);
 
-        window.addEventListener('touchstart', () => {
-            if (!this.running) {
-                this.socket.emit('packet', {
-                    action: 'ready'
-                });
-            } else {
-                this.pendingInputs.push('jump');
-                this.applyInput(this.currentState);
-            }
-        });
+        window.addEventListener('touchstart', this.handleInput.bind(this));
     }
 
     serverReconciliation() {
@@ -314,8 +298,9 @@ class ClientController {
         let lastProcessedInputSequenceNumber = this.getPlayer(this.serverState).sequenceNumber;
 
         for (let sequenceNumber of this.inputHistory.keys()) {
-            if (sequenceNumber <= lastProcessedInputSequenceNumber)
+            if (sequenceNumber <= lastProcessedInputSequenceNumber) {
                 this.inputHistory.delete(sequenceNumber);
+            }
         }
     }
 
@@ -358,7 +343,7 @@ class ClientController {
     }
 
     calculatePing() {
-        this.pings = this.pings.filter(ping => ping.received > Date.now() - 3000);
+        this.pings = this.pings.filter(ping => ping.received > Date.now() - 500);
         return Math.round(this.sum(this.pings) / this.pings.length);
     }
 

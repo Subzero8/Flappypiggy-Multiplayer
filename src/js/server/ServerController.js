@@ -27,7 +27,6 @@ class ServerController {
             });
 
         }
-        console.log('[New Match] -> ' + this.sockets.length + ' players.');
 
         this.pipes = [];
         this.pipeCounter = 0;
@@ -54,16 +53,19 @@ class ServerController {
         this.sendNewMatchNotification();
 
         this.stateHistory = new Map();
-        //this.sendStateStep();
+
+        this.lastReceivedPacketTimeStamp = null;
+        //this.ping();
 
         this.startLoop();
     }
 
-    sendStateStep(){
+    ping() {
+        this.pingTimestamp = Date.now();
+        console.log(this.pingTimestamp);
         this.sockets.forEach(socket => {
             socket.emit('packet', {
-                action: 'serverStep',
-                step: this.state.step
+                action: 'ping',
             });
         });
     }
@@ -72,6 +74,7 @@ class ServerController {
         this.players.forEach(player => {
             let socket = this.getSocket(player.number);
             socket.on('packet', packet => {
+                this.lastReceivedPacketTimeStamp = Date.now();
                 switch (packet.action) {
                     case "input":
                         this.packets.push(packet);
@@ -82,10 +85,11 @@ class ServerController {
                             this.startCountdown();
                         }
                         break;
-                    // case 'clientStep':
+                    // case 'ping':
+                    //     console.log(this.pingTimestamp);
                     //     socket.emit('packet', {
                     //         action: 'roundTrip',
-                    //         roundTrip: (this.state.step - packet.step)
+                    //         ping: (Date.now() - this.pingTimestamp) / 2
                     //     });
                     //     break;
                 }
@@ -103,12 +107,11 @@ class ServerController {
     }
 
     sendNewMatchNotification() {
-
+        console.log('[New Match] -> ' + this.sockets.length + ' players.');
         this.players.forEach(player => {
             this.getSocket(player.number).emit('packet', {
                 action: 'newGame',
-                state: this.state,
-                sent: Date.now()
+                state: this.state
             });
         });
     }
@@ -151,7 +154,8 @@ class ServerController {
     }
 
     sendUpdates() {
-        console.log('[SERVER STEP] ->', this.state.step);
+        console.log('[SERVER STEP] ->', this.state.step, '(', Date.now(), ')');
+
         this.sockets.forEach(socket => {
             socket.emit('packet', {
                 action: 'serverUpdate',
