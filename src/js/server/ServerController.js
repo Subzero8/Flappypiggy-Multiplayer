@@ -53,9 +53,7 @@ class ServerController {
         this.sendNewMatchNotification();
 
         this.stateHistory = new Map();
-
-        this.lastReceivedPacketTimeStamp = null;
-        //this.ping();
+//this.ping();
 
         this.startLoop();
     }
@@ -74,7 +72,6 @@ class ServerController {
         this.players.forEach(player => {
             let socket = this.getSocket(player.number);
             socket.on('packet', packet => {
-                this.lastReceivedPacketTimeStamp = Date.now();
                 switch (packet.action) {
                     case "input":
                         this.packets.push(packet);

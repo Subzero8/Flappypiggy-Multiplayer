@@ -18,6 +18,8 @@ class ClientController {
         this.previousPhysics = 0;
         this.lagPhysics = 0;
 
+        this.lastPhysicsFrame = null;
+
         this.lastRenderFrame = Date.now();
         //for ping calculation
         this.pings = [];
@@ -34,11 +36,14 @@ class ClientController {
 
         this.positionsHistory = new Map();
 
-        this.ping = null;
-
-        this.lastSendingPacketTimestamp = null;
-
         this.fpsTimestamps = [];
+
+        this.physicsStateHistory = [];
+
+        this.ticker = PIXI.Ticker.shared;
+        this.ticker.autoStart = false;
+        this.ticker.stop();
+        this.ticker.add(this.render.bind(this));
     }
 
     initializeNetworking() {
@@ -65,31 +70,6 @@ class ClientController {
                 //     break;
             }
         });
-    }
-
-    onServerUpdate(packet) {
-        console.log('[SERVER UPDATE]');
-        this.serverState = this.getCopy(packet.state);
-        this.serverState.players.forEach(player => {
-            if (player.number !== this.id) {
-                //If no buffer exist, create it
-                if (!this.positionsHistory.get(player.number)) {
-                    this.positionsHistory.set(player.number, []);
-                }
-                let positionHistory = this.positionsHistory.get(player.number);
-                // Add it to the position buffer.
-                positionHistory.push({
-                    step: this.serverState.step,
-                    position: player.pig.y
-                });
-            }
-        });
-        this.serverReconciliation();
-        this.pings.push({
-            received: Date.now(),
-            delay: Date.now() - packet.sent
-        });
-        this.scene.setPing(this.calculatePing());
     }
 
     onNewMatch(packet) {
@@ -119,10 +99,55 @@ class ClientController {
         this.socket.on('disconnect', () => {
             console.log('user disconnected');
             this.loopRunning = false;
+            this.ticker.stop();
         });
         this.setListeners();
         this.startLoop();
 
+    }
+
+    onServerUpdate(packet) {
+        console.log('[SERVER UPDATE]');
+        this.serverState = this.getCopy(packet.state);
+        this.serverState.players.forEach(player => {
+            if (player.number !== this.id) {
+                if (!this.positionsHistory.get(player.number)) {
+                    this.positionsHistory.set(player.number, []);
+                }
+                let positionHistory = this.positionsHistory.get(player.number);
+                positionHistory.push({
+                    step: this.serverState.step,
+                    position: player.pig.y
+                });
+                let extrapolatedPosition = this.simulatePig(this.getCopy(player.pig), 100 / PHYSICS_TICK_DURATION);
+                //console.log(extrapolatedPosition);
+            }
+        });
+        this.serverReconciliation();
+        this.pings.push({
+            received: Date.now(),
+            delay: Date.now() - packet.sent
+        });
+        this.scene.setPing(this.calculatePing());
+    }
+
+    simulatePig(pig, step) {
+        pig.y += pig.vy * step + (GRAVITY * step * step) / 2;
+        if (pig.y >= GAME_HEIGHT) {
+            pig.y = GAME_HEIGHT
+        }
+        if (pig.vy + GRAVITY <= PIG_MAX_SPEED) {
+            pig.vy += GRAVITY * step;
+        }
+        return pig.y;
+    }
+
+    startLoop() {
+        this.loopRunning = true;
+        this.startTime = Date.now();
+        //requestAnimationFrame(this.renderingLoop.bind(this));
+        this.ticker.start();
+        requestAnimationFrame(this.physicsLoop.bind(this));
     }
 
     physicsLoop() {
@@ -139,29 +164,69 @@ class ClientController {
             this.sendInputsToServer();
             if (this.running) {
                 this.updatePhysics();
+                this.lastPhysicsFrame = Date.now();
+                this.physicsStateHistory.push(this.getCopy(this.currentState));
             }
             this.lagPhysics -= PHYSICS_TICK_DURATION;
         }
         this.previousPhysics = now;
     }
 
-    startLoop() {
-        this.loopRunning = true;
-        this.startTime = Date.now();
-        requestAnimationFrame(this.renderingLoop.bind(this));
-        requestAnimationFrame(this.physicsLoop.bind(this));
+    updatePhysics() {
+        console.log('[ PHYSICS TICK ]');
+        this.simulatePhysics(this.currentState, 1);
+        //add the state to our history for later reconciliation
+        this.statesHistory.push(this.getCopy(this.currentState));
+        this.statesHistory = this.statesHistory.filter(state => state.step >= this.currentState.step - 60);
+
+        this.renderingState.players.find(player => player.number === this.id).pig = this.getCopy(this.currentState).players.find(player => player.number === this.id).pig;
+        this.renderingState.pipes = this.getCopy(this.currentState).pipes;
+        this.renderingState.step = this.getCopy(this.currentState.step);
+
     }
+
 
     renderingLoop() {
         if (this.loopRunning) {
             requestAnimationFrame(this.renderingLoop.bind(this));
         }
+        this.render();
+    }
+
+    render() {
         if (this.running) {
             this.updateRender();
+            this.scene.render(this.renderingState);
+        }
+        this.fpsTimestamps.push({
+            timestamp: Date.now()
+        });
+        this.fpsTimestamps = this.fpsTimestamps.filter(fpsTimestamp => fpsTimestamp.timestamp >= Date.now() - 1000);
+        if (this.fpsTimestamps[0].timestamp < Date.now() - 1000) {
+            this.scene.setFPS(this.fpsTimestamps.length);
         }
     }
 
+    updateRender() {
+        console.log('[ RENDER TICK ]');
+        //let now = Date.now();
+        //time since last render
+        //let deltaTime = now - this.lastRenderFrame;
+        //extrapolate it
+        this.interpolateEntities();
+        //this.extrapolateState(this.renderingState, deltaTime);
+        //render it
+
+        //this.lastRenderFrame = Date.now();
+    }
+
     interpolateEntities() {
+        this.interpolatePigs();
+        this.interpolatePipes();
+        this.interpolatePlayer();
+    }
+
+    interpolatePigs() {
         let render_step = this.renderingState.step - PHYSICS_TICKRATE / CLIENT_TICKRATE;
         //console.log(this.renderingState.step);
         this.renderingState.players.forEach(player => {
@@ -189,23 +254,51 @@ class ClientController {
         });
     }
 
-    updateRender() {
-        let now = Date.now();
-        //time since last render
-        let deltaTime = now - this.lastRenderFrame;
-        //extrapolate it
-        this.interpolateEntities();
-        this.extrapolateState(this.renderingState, deltaTime);
-        //render it
-        this.scene.render(this.renderingState);
+    interpolatePipes() {
+        while (this.physicsStateHistory.length > 2) {
+            this.physicsStateHistory.shift();
+        }
+        if (this.physicsStateHistory.length === 2) {
+            let physicsStateB = this.physicsStateHistory[0];
+            let physicsStateA = this.physicsStateHistory[1];
+            //console.log(physicsStateA);
+            //console.log(physicsStateB);
+            //console.log(this.renderingState);
+            for (let i = 0; i < this.renderingState.pipes.length; i++) {
 
-        this.fpsTimestamps.push({
-            timestamp: Date.now()
-        });
-        this.fpsTimestamps = this.fpsTimestamps.filter(fpsTimestamp => fpsTimestamp.timestamp >= Date.now() - 1000);
-        this.scene.setFPS(this.fpsTimestamps.length);
-        this.lastRenderFrame = Date.now();
+                let pipe = this.renderingState.pipes[i];
+
+                if (physicsStateA.pipes.some(p => p.number === pipe.number) &&
+                    physicsStateB.pipes.some(p => p.number === pipe.number)) {
+                    let pipeB = physicsStateB.pipes.find(p => p.number === pipe.number);
+                    let pipeA = physicsStateA.pipes.find(p => p.number === pipe.number);
+
+                    let positionB = pipeB.x;
+                    let positionA = pipeA.x;
+                    let now = Date.now();
+                    let timeSinceLastPhysicsTick = now - this.lastPhysicsFrame;
+                    let lerpFactor = timeSinceLastPhysicsTick / PHYSICS_TICK_DURATION;
+                    pipe.x = this.lerp(positionB, positionA, lerpFactor);
+
+                    // console.log('NOW = ', now);
+                    // console.log('lastPhysicsFrame', this.lastPhysicsFrame);
+                    // console.log('timeSinceLastPhysicsTick', timeSinceLastPhysicsTick);
+                    // console.log('lerpFactor', lerpFactor);
+                    // console.log('positionA', positionA, 'pipe.x', pipe.x, 'positionB', positionB);
+                }
+            }
+        }
+
     }
+
+    interpolatePlayer() {
+
+    }
+
+    lerp(x0, x1, ratio) {
+        return x0 * (1 - ratio) + x1 * ratio;
+    }
+
 
     extrapolateState(state, deltaTime) {
         //of how much do we want to update the game ?
@@ -263,7 +356,6 @@ class ClientController {
             this.socket.emit('packet', {
                 action: 'ready'
             });
-            this.lastSendingPacketTimestamp = Date.now();
         } else {
             this.pendingInputs.push('jump');
             this.applyInput(this.currentState);
@@ -280,8 +372,8 @@ class ClientController {
     }
 
     serverReconciliation() {
-        console.log(this.currentState);
-        console.log(this.serverState);
+        // console.log(this.currentState);
+        // console.log(this.serverState);
         this.discardProcessedInputs();
         this.checkUnprocessedInputs();
         this.checkServerBehindClient();
@@ -330,17 +422,6 @@ class ClientController {
         }
     }
 
-
-    updatePhysics() {
-        this.simulatePhysics(this.currentState, 1);
-        //add the state to our history for later reconciliation
-        this.statesHistory.push(this.getCopy(this.currentState));
-        this.statesHistory = this.statesHistory.filter(state => state.step >= this.currentState.step - 60);
-
-        this.renderingState.players.find(player => player.number === this.id).pig = this.getCopy(this.currentState).players.find(player => player.number === this.id).pig;
-        this.renderingState.pipes = this.getCopy(this.currentState).pipes;
-        this.renderingState.step = this.currentState.step;
-    }
 
     calculatePing() {
         this.pings = this.pings.filter(ping => ping.received > Date.now() - 500);
