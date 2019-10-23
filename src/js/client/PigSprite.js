@@ -15,8 +15,8 @@ class PigSprite extends Container {
             fill: "white",
         });
         this.playerNumber = new PIXI.Text('PLAYER ' + (this.number + 1), style);
-        this.playerNumber.y = -50
-        this.playerNumber.x = (clientPig.width - this.playerNumber.width)/2
+        this.playerNumber.y = -50;
+        this.playerNumber.x = (clientPig.width - this.playerNumber.width) / 2;
         this.addChild(this.texture);
         this.addChild(this.playerNumber);
     }

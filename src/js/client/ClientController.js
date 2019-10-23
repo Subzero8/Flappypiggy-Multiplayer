@@ -47,6 +47,7 @@ class ClientController {
 
         this.sent = null;
 
+        this.pingLoop = setInterval(this.sendPing, 1000);
     }
 
     sendPing() {
@@ -133,11 +134,6 @@ class ClientController {
             }
         });
         this.serverReconciliation();
-        this.pings.push({
-            received: Date.now(),
-            delay: Date.now() - packet.sent
-        });
-        this.scene.setPing(this.calculatePing());
     }
 
     simulatePig(pig, step) {
@@ -158,7 +154,6 @@ class ClientController {
         this.ticker.start();
         requestAnimationFrame(this.physicsLoop.bind(this));
 
-        this.pingLoop = setInterval(this.sendPing, 1000);
     }
 
     physicsLoop() {
