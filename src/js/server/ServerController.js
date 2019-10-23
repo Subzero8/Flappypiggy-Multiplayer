@@ -53,19 +53,8 @@ class ServerController {
         this.sendNewMatchNotification();
 
         this.stateHistory = new Map();
-//this.ping();
 
         this.startLoop();
-    }
-
-    ping() {
-        this.pingTimestamp = Date.now();
-        console.log(this.pingTimestamp);
-        this.sockets.forEach(socket => {
-            socket.emit('packet', {
-                action: 'ping',
-            });
-        });
     }
 
     initializeNetworking() {
@@ -82,13 +71,11 @@ class ServerController {
                             this.startCountdown();
                         }
                         break;
-                    // case 'ping':
-                    //     console.log(this.pingTimestamp);
-                    //     socket.emit('packet', {
-                    //         action: 'roundTrip',
-                    //         ping: (Date.now() - this.pingTimestamp) / 2
-                    //     });
-                    //     break;
+                    case 'ping':
+                        socket.emit('packet', {
+                            action: 'pong'
+                        });
+                        break;
                 }
             });
         });

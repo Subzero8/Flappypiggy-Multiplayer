@@ -44,8 +44,17 @@ class ClientController {
         this.ticker.autoStart = false;
         this.ticker.stop();
         this.ticker.add(this.render.bind(this));
+
+        this.sent = null;
+
     }
 
+    sendPing() {
+        this.sent = Date.now();
+        this.socket.emit('packet', {
+            action: 'ping'
+        })
+    }
     initializeNetworking() {
         this.socket.on('packet', packet => {
             switch (packet.action) {
@@ -58,12 +67,11 @@ class ClientController {
                 case "id":
                     this.id = packet.id;
                     break;
-                // case "ping":
-                //     console.log('ping');
-                //     this.socket.emit('packet', {
-                //         action: 'ping',
-                //     });
-                //     break;
+                case "pong":
+                    console.log('pong');
+                    let ping = Date.now() - this.sent;
+                    this.scene.setPing(ping);
+                    break;
                 // case "roundTrip":
                 //     this.ping = this.calculatePing(packet.ping);
                 //     this.scene.setPing(this.ping);
@@ -100,6 +108,7 @@ class ClientController {
             console.log('user disconnected');
             this.loopRunning = false;
             this.ticker.stop();
+            clearInterval(this.pingLoop);
         });
         this.setListeners();
         this.startLoop();
@@ -148,6 +157,8 @@ class ClientController {
         //requestAnimationFrame(this.renderingLoop.bind(this));
         this.ticker.start();
         requestAnimationFrame(this.physicsLoop.bind(this));
+
+        this.pingLoop = setInterval(this.sendPing, 1000);
     }
 
     physicsLoop() {
