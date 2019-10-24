@@ -30,7 +30,7 @@ class Scene {
         state.pipes.forEach(pipe => {
             let pipeSprite = this.pipeSprites.find(pipeSprite => pipeSprite.number === pipe.number);
             if (pipeSprite) {
-                pipeSprite.position.x = pipe.x;
+                pipeSprite.position.set(pipe.x, pipeSprite.position.y);
                 this.adjustPosition(pipeSprite);
             } else {
                 this.addPipeSprite(pipe)

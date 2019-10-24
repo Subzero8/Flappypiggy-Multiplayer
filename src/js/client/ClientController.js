@@ -47,7 +47,7 @@ class ClientController {
 
         this.sent = null;
 
-        this.pingLoop = setInterval(this.sendPing, 1000);
+        this.pingLoop = setInterval(this.sendPing.bind(this), 1000);
     }
 
     sendPing() {
@@ -56,6 +56,7 @@ class ClientController {
             action: 'ping'
         })
     }
+
     initializeNetworking() {
         this.socket.on('packet', packet => {
             switch (packet.action) {
@@ -77,8 +78,37 @@ class ClientController {
                 //     this.ping = this.calculatePing(packet.ping);
                 //     this.scene.setPing(this.ping);
                 //     break;
+                case 'countdown':
+                    this.gameCountdown(packet.count);
+                    break;
+
             }
         });
+        // this.socket.on('won', () => this.scene.displayMessage(this.scene.annoncer, 'You Won !'));
+        // this.socket.on('lost', () => this.scene.displayMessage(this.scene.annoncer, 'You Lost !'));
+        this.socket.on('disconnect', () => this.stopLoops());
+    }
+
+    stopLoops() {
+        console.log('user disconnected');
+        this.loopRunning = false;
+        this.ticker.stop();
+        clearInterval(this.pingLoop);
+    }
+
+    gameCountdown(count) {
+        switch (count) {
+            case 0:
+                this.scene.displayMessage(this.scene.annoncer, 'Go !');
+                this.running = true;
+                break;
+            case -1:
+                this.scene.displayMessage(this.scene.annoncer, '');
+                break;
+            default:
+                this.scene.displayMessage(this.scene.annoncer, count)
+
+        }
     }
 
     onNewMatch(packet) {
@@ -89,28 +119,6 @@ class ClientController {
         //initialize Scene
         this.scene.initialize(this.currentState, this.id);
         this.scene.displayMessage(this.scene.annoncer, 'Match Found !');
-        this.socket.on('won', () => this.scene.displayMessage(this.scene.annoncer, 'You Won !'));
-        this.socket.on('lost', () => this.scene.displayMessage(this.scene.annoncer, 'You Lost !'));
-        this.socket.on('countdown', count => {
-            switch (count) {
-                case 0:
-                    this.scene.displayMessage(this.scene.annoncer, 'Go !');
-                    this.running = true;
-                    break;
-                case -1:
-                    this.scene.displayMessage(this.scene.annoncer, '');
-                    break;
-                default:
-                    this.scene.displayMessage(this.scene.annoncer, count)
-
-            }
-        });
-        this.socket.on('disconnect', () => {
-            console.log('user disconnected');
-            this.loopRunning = false;
-            this.ticker.stop();
-            clearInterval(this.pingLoop);
-        });
         this.setListeners();
         this.startLoop();
 
@@ -134,6 +142,7 @@ class ClientController {
             }
         });
         this.serverReconciliation();
+        this.currentState.pipes = this.serverState.pipes;
     }
 
     simulatePig(pig, step) {
@@ -179,7 +188,7 @@ class ClientController {
     }
 
     updatePhysics() {
-        console.log('[ PHYSICS TICK ]');
+        //console.log('[ PHYSICS TICK ]');
         this.simulatePhysics(this.currentState, 1);
         //add the state to our history for later reconciliation
         this.statesHistory.push(this.getCopy(this.currentState));
@@ -188,7 +197,6 @@ class ClientController {
         this.renderingState.players.find(player => player.number === this.id).pig = this.getCopy(this.currentState).players.find(player => player.number === this.id).pig;
         this.renderingState.pipes = this.getCopy(this.currentState).pipes;
         this.renderingState.step = this.getCopy(this.currentState.step);
-
     }
 
 
@@ -202,7 +210,6 @@ class ClientController {
     render() {
         if (this.running) {
             this.updateRender();
-            this.scene.render(this.renderingState);
         }
         this.fpsTimestamps.push({
             timestamp: Date.now()
@@ -214,7 +221,7 @@ class ClientController {
     }
 
     updateRender() {
-        console.log('[ RENDER TICK ]');
+        //console.log('[ RENDER TICK ]');
         //let now = Date.now();
         //time since last render
         //let deltaTime = now - this.lastRenderFrame;
@@ -223,6 +230,7 @@ class ClientController {
         //this.extrapolateState(this.renderingState, deltaTime);
         //render it
 
+        this.scene.render(this.renderingState);
         //this.lastRenderFrame = Date.now();
     }
 
@@ -273,7 +281,6 @@ class ClientController {
             for (let i = 0; i < this.renderingState.pipes.length; i++) {
 
                 let pipe = this.renderingState.pipes[i];
-
                 if (physicsStateA.pipes.some(p => p.number === pipe.number) &&
                     physicsStateB.pipes.some(p => p.number === pipe.number)) {
                     let pipeB = physicsStateB.pipes.find(p => p.number === pipe.number);
@@ -286,6 +293,7 @@ class ClientController {
                     let lerpFactor = timeSinceLastPhysicsTick / PHYSICS_TICK_DURATION;
                     pipe.x = this.lerp(positionB, positionA, lerpFactor);
 
+                    // console.log('pipeNumber = ', pipe.number);
                     // console.log('NOW = ', now);
                     // console.log('lastPhysicsFrame', this.lastPhysicsFrame);
                     // console.log('timeSinceLastPhysicsTick', timeSinceLastPhysicsTick);
@@ -384,7 +392,7 @@ class ClientController {
         this.checkUnprocessedInputs();
         this.checkServerBehindClient();
 
-        this.currentState.pipes = this.serverState.pipes;
+
         // for (let i = 0; i < this.currentState.players.length; i++) {
         //         //     if (this.currentState.players[i].number !== this.id) {
         //         //         this.currentState.players[i] = this.serverState.players[i];
@@ -405,9 +413,8 @@ class ClientController {
     checkServerBehindClient() {
         //if client ahead of server, simulate
         let deltaStep = this.currentState.step - this.serverState.step;
-        if (deltaStep > 0) {
-            this.simulateGame(this.serverState, deltaStep);
-        }
+        console.log('DELTA STEP', deltaStep);
+        this.simulateGame(this.serverState, deltaStep);
     }
 
     checkUnprocessedInputs() {
@@ -448,8 +455,16 @@ class ClientController {
 
 
     simulateGame(state, nbTicks) {
-        for (let i = 0; i < nbTicks; i++) {
-            this.simulatePhysics(state, 1);
+        if (nbTicks > 0) {
+            for (let i = 0; i < nbTicks; i++) {
+                this.simulatePhysics(state, 1);
+            }
+        } else {
+            let ticks = Math.abs(nbTicks);
+            for (let i = 0; i < ticks; i++) {
+                this.simulatePhysics(state, -1);
+            }
         }
+
     }
 }

@@ -103,27 +103,42 @@ class ServerController {
     startCountdown() {
         this.countdownStarted = true;
         this.players.forEach(player => {
-            this.getSocket(player.number).emit('countdown', 3);
+            this.getSocket(player.number).emit('packet', {
+                action: 'countdown',
+                count: 3
+            });
         });
         setTimeout(() => {
             this.players.forEach(player => {
-                this.getSocket(player.number).emit('countdown', 2);
+                this.getSocket(player.number).emit('packet', {
+                    action: 'countdown',
+                    count: 2
+                });
             })
         }, 1000);
         setTimeout(() => {
             this.players.forEach(player => {
-                this.getSocket(player.number).emit('countdown', 1);
+                this.getSocket(player.number).emit('packet', {
+                    action: 'countdown',
+                    count: 1
+                });
             })
         }, 2000);
         setTimeout(() => {
             this.players.forEach(player => {
-                this.getSocket(player.number).emit('countdown', 0);
+                this.getSocket(player.number).emit('packet', {
+                    action: 'countdown',
+                    count: 0
+                });
                 this.running = true;
             });
         }, 3000);
         setTimeout(() => {
             this.players.forEach(player => {
-                this.getSocket(player.number).emit('countdown', -1);
+                this.getSocket(player.number).emit('packet', {
+                    action: 'countdown',
+                    count: -1
+                });
             })
         }, 4000)
     }
@@ -160,7 +175,7 @@ class ServerController {
         }
         this.lagUpdate += delta;
         if (this.lagUpdate >= CLIENT_TICK_DURATION) {
-            if (this.running){
+            if (this.running) {
                 this.sendUpdates();
             }
             this.lagUpdate -= CLIENT_TICK_DURATION;
@@ -179,7 +194,7 @@ class ServerController {
         }
         this.lagPhysics += delta;
         if (this.lagPhysics >= PHYSICS_TICK_DURATION) {
-            if (this.running){
+            if (this.running) {
                 this.handleInputs();
                 this.updatePhysics(this.state);
                 this.notifyObservers(delta);
@@ -208,7 +223,7 @@ class ServerController {
             console.log('[REWINDING] ->', deltaStep, 'steps');
 
             let oldState = this.state.copy();
-            if (deltaStep > 0){
+            if (deltaStep > 0) {
                 oldState = this.stateHistory.get(packet.step).copy();
             }
             let player = oldState.players.find(player => player.number === packet.id);
