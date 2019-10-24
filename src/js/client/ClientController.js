@@ -106,6 +106,7 @@ class ClientController {
         switch (count) {
             case 0:
                 this.scene.displayMessage(this.scene.annoncer, 'Go !');
+                this.nextGameTick = Date.now();
                 this.running = true;
                 break;
             case -1:
@@ -160,7 +161,6 @@ class ClientController {
 
     startLoop() {
         this.loopRunning = true;
-        this.nextGameTick = Date.now();
         requestAnimationFrame(this.gameLoop.bind(this));
     }
 
@@ -168,22 +168,17 @@ class ClientController {
         if (this.loopRunning) {
             requestAnimationFrame(this.gameLoop.bind(this));
         }
-        //Date.now()=15 > 0=this.nextGameTick
-        //this.nextGameTick = 16
-        //Date.now()=33 > 16=this.nextGameTick
-        //this.nextGameTick = 32
-        //Date.now()=34 > 32=this.nextGameTick
-        //this.nextGameTick = 48
+
         this.sendInputsToServer();
         if (this.running) {
             let loops = 0;
-            console.log('Date.now()=', Date.now(), 'this.nextGameTick=', this.nextGameTick);
-            while (Date.now() > this.nextGameTick && loops < 5) {
+            // console.log('Date.now()=', Date.now(), 'this.nextGameTick=', this.nextGameTick);
+            while (Date.now() > this.nextGameTick && loops < 30) {
                 this.updatePhysics();
                 this.nextGameTick += PHYSICS_TICK_DURATION;
-                console.log('this.nextGameTick=', this.nextGameTick);
+                // console.log('this.nextGameTick=', this.nextGameTick);
                 loops++;
-                console.log('loops=', loops);
+                // console.log('loops=', loops);
             }
             let interpolation = (Date.now() + PHYSICS_TICK_DURATION - this.nextGameTick) / PHYSICS_TICK_DURATION;
             this.updateRender(interpolation);
