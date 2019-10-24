@@ -11,7 +11,7 @@ class Scene {
         this.initializeFPSDisplay();
     }
 
-    render(state) {
+    updateScene(state) {
         this.updatePigs(state);
         this.updatePipes(state);
         this.deleteUnusedPipes(state);
@@ -32,6 +32,7 @@ class Scene {
             if (pipeSprite) {
                 pipeSprite.position.set(pipe.x, pipeSprite.position.y);
                 this.adjustPosition(pipeSprite);
+                //console.log('pipeSprite.position.x', pipeSprite.position.x);
             } else {
                 this.addPipeSprite(pipe)
             }

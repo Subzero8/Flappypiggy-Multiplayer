@@ -18,6 +18,10 @@ class ClientController {
         this.previousPhysics = 0;
         this.lagPhysics = 0;
 
+        //for physics loop
+        this.previousRender = 0;
+        this.lagRender = 0;
+
         this.lastPhysicsFrame = null;
 
         this.lastRenderFrame = Date.now();
@@ -30,7 +34,7 @@ class ClientController {
         //state for rendering
         this.renderingState = null;
         //current game state physic wise
-        this.currentState = null;
+        this.logicState = null;
         //server state received
         this.serverState = null;
 
@@ -43,11 +47,14 @@ class ClientController {
         this.ticker = PIXI.Ticker.shared;
         this.ticker.autoStart = false;
         this.ticker.stop();
-        this.ticker.add(this.render.bind(this));
+        this.ticker.add(delta => this.updateRender(delta));
 
         this.sent = null;
 
         this.pingLoop = setInterval(this.sendPing.bind(this), 1000);
+
+        this.debugging = false;
+
     }
 
     sendPing() {
@@ -92,7 +99,6 @@ class ClientController {
     stopLoops() {
         console.log('user disconnected');
         this.loopRunning = false;
-        this.ticker.stop();
         clearInterval(this.pingLoop);
     }
 
@@ -113,11 +119,11 @@ class ClientController {
 
     onNewMatch(packet) {
         console.log("[MATCH FOUND]");
-        this.currentState = this.getCopy(packet.state);
-        this.renderingState = this.getCopy(packet.state);
+        this.logicState = this.getCopy(packet.state);
+        this.renderingState = this.getCopy(this.logicState);
         this.onServerUpdate(packet);
         //initialize Scene
-        this.scene.initialize(this.currentState, this.id);
+        this.scene.initialize(this.logicState, this.id);
         this.scene.displayMessage(this.scene.annoncer, 'Match Found !');
         this.setListeners();
         this.startLoop();
@@ -137,80 +143,108 @@ class ClientController {
                     step: this.serverState.step,
                     position: player.pig.y
                 });
-                let extrapolatedPosition = this.simulatePig(this.getCopy(player.pig), 100 / PHYSICS_TICK_DURATION);
+                //let extrapolatedPosition = this.simulatePig(this.getCopy(player.pig), 100 / PHYSICS_TICK_DURATION);
                 //console.log(extrapolatedPosition);
             }
         });
+        // console.log('[BEFORE serverReconciliation]');
+        // console.log('this.serverState.step', this.serverState.step);
+        // console.log('this.logicState.step', this.logicState.step);
         this.serverReconciliation();
-        this.currentState.pipes = this.serverState.pipes;
-    }
+        // console.log('[AFTER serverReconciliation]');
+        // console.log('this.serverState.step', this.serverState.step);
+        // console.log('this.logicState.step', this.logicState.step);
 
-    simulatePig(pig, step) {
-        pig.y += pig.vy * step + (GRAVITY * step * step) / 2;
-        if (pig.y >= GAME_HEIGHT) {
-            pig.y = GAME_HEIGHT
-        }
-        if (pig.vy + GRAVITY <= PIG_MAX_SPEED) {
-            pig.vy += GRAVITY * step;
-        }
-        return pig.y;
+        this.logicState = this.getCopy(this.serverState);
     }
 
     startLoop() {
         this.loopRunning = true;
-        this.startTime = Date.now();
-        //requestAnimationFrame(this.renderingLoop.bind(this));
-        this.ticker.start();
-        requestAnimationFrame(this.physicsLoop.bind(this));
-
+        this.nextGameTick = Date.now();
+        requestAnimationFrame(this.gameLoop.bind(this));
     }
 
-    physicsLoop() {
+    gameLoop() {
         if (this.loopRunning) {
-            requestAnimationFrame(this.physicsLoop.bind(this));
+            requestAnimationFrame(this.gameLoop.bind(this));
         }
-        let now = Date.now();
-        let delta = now - this.previousPhysics;
-        if (delta > 1000) {
-            delta = PHYSICS_TICK_DURATION;
-        }
-        this.lagPhysics += delta;
-        if (this.lagPhysics >= PHYSICS_TICK_DURATION) {
-            this.sendInputsToServer();
-            if (this.running) {
+        //Date.now()=15 > 0=this.nextGameTick
+        //this.nextGameTick = 16
+        //Date.now()=33 > 16=this.nextGameTick
+        //this.nextGameTick = 32
+        //Date.now()=34 > 32=this.nextGameTick
+        //this.nextGameTick = 48
+        this.sendInputsToServer();
+        if (this.running) {
+            let loops = 0;
+            console.log('Date.now()=', Date.now(), 'this.nextGameTick=', this.nextGameTick);
+            while (Date.now() > this.nextGameTick && loops < 5) {
                 this.updatePhysics();
-                this.lastPhysicsFrame = Date.now();
-                this.physicsStateHistory.push(this.getCopy(this.currentState));
+                this.nextGameTick += PHYSICS_TICK_DURATION;
+                console.log('this.nextGameTick=', this.nextGameTick);
+                loops++;
+                console.log('loops=', loops);
             }
-            this.lagPhysics -= PHYSICS_TICK_DURATION;
+            let interpolation = (Date.now() + PHYSICS_TICK_DURATION - this.nextGameTick) / PHYSICS_TICK_DURATION;
+            this.updateRender(interpolation);
         }
-        this.previousPhysics = now;
+
     }
+
 
     updatePhysics() {
-        //console.log('[ PHYSICS TICK ]');
-        this.simulatePhysics(this.currentState, 1);
+        if (this.debugging) {
+            console.log('');
+            console.log('[ PHYSICS TICK ]');
+            console.log('[ BEFORE simulatePhysics ]');
+            for (let i = 0; i < this.logicState.pipes.length; i++) {
+                let physicsPipe = this.logicState.pipes[i];
+                console.log('physicsPipe = ', physicsPipe.x);
+            }
+        }
+        this.logicState = this.getCopy(this.simulatePhysics(this.logicState, 1));
+
+        if (this.debugging) {
+            console.log('[ AFTER simulatePhysics ]');
+            for (let i = 0; i < this.logicState.pipes.length; i++) {
+                let physicsPipe = this.logicState.pipes[i];
+                console.log('physicsPipe = ', physicsPipe.x);
+            }
+        }
         //add the state to our history for later reconciliation
-        this.statesHistory.push(this.getCopy(this.currentState));
-        this.statesHistory = this.statesHistory.filter(state => state.step >= this.currentState.step - 60);
+        this.statesHistory.push(this.getCopy(this.logicState));
+        this.statesHistory = this.statesHistory.filter(state => state.step >= this.logicState.step - 60);
 
-        this.renderingState.players.find(player => player.number === this.id).pig = this.getCopy(this.currentState).players.find(player => player.number === this.id).pig;
-        this.renderingState.pipes = this.getCopy(this.currentState).pipes;
-        this.renderingState.step = this.getCopy(this.currentState.step);
+        this.renderingState = this.getCopy(this.logicState);
+
+        this.physicsStateHistory.push(this.getCopy(this.logicState));
+
     }
 
-
-    renderingLoop() {
-        if (this.loopRunning) {
-            requestAnimationFrame(this.renderingLoop.bind(this));
+    updateRender(interpolation) {
+        if (this.debugging) {
+            console.log('');
+            console.log('[ RENDER TICK ] (last physic=', Date.now() - this.lastPhysicsFrame, ')');
+            //extrapolate it
+            //this.interpolateEntities();
+            console.log('[ BEFORE extrapolateState ]');
+            for (let i = 0; i < this.renderingState.pipes.length; i++) {
+                let renderingPipe = this.renderingState.pipes[i];
+                console.log('renderingPipe.x = ', renderingPipe.x);
+            }
         }
-        this.render();
-    }
-
-    render() {
-        if (this.running) {
-            this.updateRender();
+        this.renderingState = this.getCopy(this.simulatePhysics(this.logicState, interpolation));
+        this.interpolateEntities();
+        //render it
+        if (this.debugging) {
+            console.log('[ AFTER extrapolateState ]');
+            for (let i = 0; i < this.renderingState.pipes.length; i++) {
+                let renderingPipe = this.renderingState.pipes[i];
+                console.log('renderingPipe.x = ', renderingPipe.x);
+            }
         }
+
+        this.scene.updateScene(this.renderingState);
         this.fpsTimestamps.push({
             timestamp: Date.now()
         });
@@ -220,24 +254,8 @@ class ClientController {
         }
     }
 
-    updateRender() {
-        //console.log('[ RENDER TICK ]');
-        //let now = Date.now();
-        //time since last render
-        //let deltaTime = now - this.lastRenderFrame;
-        //extrapolate it
-        this.interpolateEntities();
-        //this.extrapolateState(this.renderingState, deltaTime);
-        //render it
-
-        this.scene.render(this.renderingState);
-        //this.lastRenderFrame = Date.now();
-    }
-
     interpolateEntities() {
         this.interpolatePigs();
-        this.interpolatePipes();
-        this.interpolatePlayer();
     }
 
     interpolatePigs() {
@@ -278,9 +296,15 @@ class ClientController {
             //console.log(physicsStateA);
             //console.log(physicsStateB);
             //console.log(this.renderingState);
-            for (let i = 0; i < this.renderingState.pipes.length; i++) {
 
-                let pipe = this.renderingState.pipes[i];
+            for (let i = 0; i < physicsStateA.pipes.length; i++) {
+
+                let pipe = physicsStateA.pipes[i];
+                if (!this.renderingState.pipes.some(p => p.number === pipe.number)) {
+                    this.renderingState.pipes.push(this.getCopy(pipe));
+                }
+                let pipeToRender = this.renderingState.pipes.find(p => p.number === pipe.number);
+
                 if (physicsStateA.pipes.some(p => p.number === pipe.number) &&
                     physicsStateB.pipes.some(p => p.number === pipe.number)) {
                     let pipeB = physicsStateB.pipes.find(p => p.number === pipe.number);
@@ -291,14 +315,16 @@ class ClientController {
                     let now = Date.now();
                     let timeSinceLastPhysicsTick = now - this.lastPhysicsFrame;
                     let lerpFactor = timeSinceLastPhysicsTick / PHYSICS_TICK_DURATION;
-                    pipe.x = this.lerp(positionB, positionA, lerpFactor);
+                    let oldx = pipeToRender.x;
+                    pipeToRender.x = this.lerp(positionB, positionA, lerpFactor);
 
                     // console.log('pipeNumber = ', pipe.number);
                     // console.log('NOW = ', now);
                     // console.log('lastPhysicsFrame', this.lastPhysicsFrame);
-                    // console.log('timeSinceLastPhysicsTick', timeSinceLastPhysicsTick);
-                    // console.log('lerpFactor', lerpFactor);
-                    // console.log('positionA', positionA, 'pipe.x', pipe.x, 'positionB', positionB);
+                    //console.log('timeSinceLastPhysicsTick', timeSinceLastPhysicsTick);
+                    //console.log('lerpFactor', lerpFactor);
+                    //console.log('positionA', positionA, 'pipeToRender.x', pipeToRender.x, 'positionB', positionB);
+                    console.log('delta = ', pipeToRender.x - oldx);
                 }
             }
         }
@@ -313,19 +339,12 @@ class ClientController {
         return x0 * (1 - ratio) + x1 * ratio;
     }
 
-
-    extrapolateState(state, deltaTime) {
-        //of how much do we want to update the game ?
-        let stepsToExtrapolate = deltaTime / PHYSICS_TICK_DURATION;
-        return this.simulatePhysics(state, stepsToExtrapolate);
-    }
-
     applyInput(state) {
         let localPlayer = state.players.find(player => player.number === this.id);
         if (this.pendingInputs.length > 0) {
             localPlayer.pig.vy = PIG_SPEED;
-            console.log('[INPUT APPLIED] ->', this.currentState.step);
-            this.inputHistory.set(this.sequenceNumber, this.currentState.step);
+            console.log('[INPUT APPLIED] ->', this.logicState.step);
+            this.inputHistory.set(this.sequenceNumber, this.logicState.step);
         }
     }
 
@@ -338,7 +357,7 @@ class ClientController {
             this.socket.emit('packet', {
                 action: 'input',
                 id: this.id,
-                step: this.currentState.step,
+                step: this.logicState.step,
                 sequenceNumber: this.sequenceNumber,
                 data: this.pendingInputs
             });
@@ -348,10 +367,11 @@ class ClientController {
     }
 
     simulatePhysics(state, step) {
-        state.pipes.forEach(pipe => {
+        let simulatedState = this.getCopy(state);
+        simulatedState.pipes.forEach(pipe => {
             pipe.x += PIPE_SPEED * step;
         });
-        state.players.forEach(player => {
+        simulatedState.players.forEach(player => {
             if (player.number === this.id) {
                 player.pig.y += player.pig.vy * step;
                 if (player.pig.y >= GAME_HEIGHT) {
@@ -362,7 +382,8 @@ class ClientController {
                 }
             }
         });
-        state.step += step;
+        simulatedState.step += step;
+        return simulatedState;
     }
 
     handleInput() {
@@ -372,7 +393,7 @@ class ClientController {
             });
         } else {
             this.pendingInputs.push('jump');
-            this.applyInput(this.currentState);
+            this.applyInput(this.logicState);
         }
     }
 
@@ -390,8 +411,8 @@ class ClientController {
         // console.log(this.serverState);
         this.discardProcessedInputs();
         this.checkUnprocessedInputs();
-        this.checkServerBehindClient();
-
+        let deltaStep = this.logicState.step - this.serverState.step;
+        this.serverState = this.simulateGame(this.serverState, deltaStep);
 
         // for (let i = 0; i < this.currentState.players.length; i++) {
         //         //     if (this.currentState.players[i].number !== this.id) {
@@ -412,9 +433,7 @@ class ClientController {
 
     checkServerBehindClient() {
         //if client ahead of server, simulate
-        let deltaStep = this.currentState.step - this.serverState.step;
-        console.log('DELTA STEP', deltaStep);
-        this.simulateGame(this.serverState, deltaStep);
+
     }
 
     checkUnprocessedInputs() {
@@ -455,16 +474,17 @@ class ClientController {
 
 
     simulateGame(state, nbTicks) {
+        let simulatedState = this.getCopy(state);
         if (nbTicks > 0) {
             for (let i = 0; i < nbTicks; i++) {
-                this.simulatePhysics(state, 1);
+                simulatedState = this.simulatePhysics(state, 1);
             }
         } else {
             let ticks = Math.abs(nbTicks);
             for (let i = 0; i < ticks; i++) {
-                this.simulatePhysics(state, -1);
+                simulatedState = this.simulatePhysics(state, -1);
             }
         }
-
+        return simulatedState;
     }
 }

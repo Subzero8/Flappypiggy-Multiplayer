@@ -13,14 +13,12 @@ const PIG_SPEED = -20;
 const PIPE_SPEED = -10;
 const PIG_MAX_SPEED = 10;
 //can't change
-const PHYSICS_TICKRATE = 60;
 const CLIENT_TICKRATE = 1;
 
+const PHYSICS_TICKRATE = 60;
 const PHYSICS_TICK_DURATION = 1000 / PHYSICS_TICKRATE; //in ms
 
-
-//client constants
-const RENDER_TICK_RATE = 60;
-const RENDER_FRAME_TIME = 1000 / RENDER_TICK_RATE;//in ms
+const RENDER_TICK_RATE = 120;
+const RENDER_TICK_DURATION = 1000 / RENDER_TICK_RATE; //in ms
 
 const PIG_DEVIATION_MARGIN = 20;

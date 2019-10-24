@@ -11,9 +11,9 @@ class PipeSprite extends Container {
         this.bottomPart.width = pipe.width;
         this.bottomPart.height = pipe.height;
         //positions
-        this.topPart.y = pipe.topY
-        this.bottomPart.y = pipe.bottomY
-        this.x = pipe.x
+        this.topPart.y = pipe.topY;
+        this.bottomPart.y = pipe.bottomY;
+        this.x = pipe.x;
         //addchild
         this.addChild(this.topPart);
         this.addChild(this.bottomPart);
