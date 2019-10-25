@@ -344,7 +344,6 @@ class ClientController {
         let localPlayer = state.players.find(player => player.number === this.id);
         localPlayer.pig.vy = PIG_SPEED;
         //console.log('[INPUT APPLIED] ->', this.logicState.step);
-        this.inputHistory.set(this.sequenceNumber, this.logicState.step);
     }
 
     getCopy(object) {
@@ -393,6 +392,7 @@ class ClientController {
         } else {
             this.pendingInputs.push('jump');
             this.applyInput(this.logicState);
+            this.inputHistory.set(this.sequenceNumber, this.logicState.step);
         }
     }
 
@@ -436,21 +436,19 @@ class ClientController {
     }
 
     checkUnprocessedInputs() {
-        let oldState = null;
         //check for unprocessed input from server
+        console.log('this.serverState', this.serverState);
         for (let sequenceNumber of this.inputHistory.keys()) {
+            console.log('sequenceNumber=', sequenceNumber);
             let oldStep = this.inputHistory.get(sequenceNumber);
             console.log('Old step =', oldStep);
-            let deltaStep = this.serverState.step - oldStep;
+            let deltaStep = oldStep - this.serverState.step;
             console.log('deltaStep =', deltaStep);
-            oldState = this.getCopy(this.statesHistory.find(state => state.step === oldStep));
-            oldState = this.getCopy(this.simulateGame(oldState, deltaStep));
-            this.applyInput(oldState);
+            this.serverState = this.getCopy(this.simulateGame(this.serverState, deltaStep));
+            this.applyInput(this.serverState);
+
         }
-        if (oldState) {
-            console.log(oldState);
-            this.serverState = this.getCopy(oldState)
-        }
+        console.log('this.serverState', this.serverState);
     }
 
 
@@ -475,9 +473,9 @@ class ClientController {
     simulateGame(state, nbTicks) {
         console.log('simulateGame(', nbTicks, ')');
         let simulatedState = this.getCopy(state);
+        console.log(simulatedState);
         let ticks = Math.abs(nbTicks);
         if (nbTicks > 0) {
-            console.log(simulatedState);
             for (let i = 0; i < ticks; i++) {
                 simulatedState = this.simulatePhysics(state, 1);
             }
@@ -486,6 +484,7 @@ class ClientController {
                 simulatedState = this.simulatePhysics(state, -1);
             }
         }
+        console.log(simulatedState);
         return simulatedState;
     }
 }
