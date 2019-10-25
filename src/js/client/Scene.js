@@ -9,6 +9,7 @@ class Scene {
         this.initializeAnnoncer();
         this.initializePingDisplay();
         this.initializeFPSDisplay();
+        this.initializeUPSDisplay();
     }
 
     updateScene(state) {
@@ -165,6 +166,19 @@ class Scene {
         this.app.stage.addChild(this.fps);
     }
 
+    initializeUPSDisplay() {
+        let style = new PIXI.TextStyle({
+            fontFamily: "Futura",
+            fontSize: 30 * this.app.renderer.width / this.app.renderer.resolution / GAME_WIDTH,
+            fill: "white"
+        });
+        this.ups = new PIXI.Text("UPS : 0", style);
+
+        this.ups.x = window.innerWidth * 0.3;
+        this.ups.y = window.innerHeight * 0.01;
+        this.app.stage.addChild(this.ups);
+    }
+
     setPing(value) {
         this.ping.text = "Ping : " + value;
     }
@@ -172,4 +186,10 @@ class Scene {
     setFPS(value) {
         this.fps.text = "FPS : " + Math.round(value);
     }
+
+    setUPS(value) {
+        this.ups.text = "UPS : " + Math.round(value);
+    }
+
+
 }

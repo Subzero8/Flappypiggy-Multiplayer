@@ -41,6 +41,7 @@ class ClientController {
         this.positionsHistory = new Map();
 
         this.fpsTimestamps = [];
+        this.upsTimestamps = [];
 
         this.physicsStateHistory = [];
 
@@ -99,6 +100,7 @@ class ClientController {
     stopLoops() {
         console.log('user disconnected');
         this.loopRunning = false;
+        this.running = false;
         clearInterval(this.pingLoop);
     }
 
@@ -106,8 +108,8 @@ class ClientController {
         switch (count) {
             case 0:
                 this.scene.displayMessage(this.scene.annoncer, 'Go !');
-                this.nextGameTick = Date.now();
                 this.running = true;
+                this.nextGameTick = Date.now();
                 break;
             case -1:
                 this.scene.displayMessage(this.scene.annoncer, '');
@@ -148,14 +150,14 @@ class ClientController {
                 //console.log(extrapolatedPosition);
             }
         });
-        // console.log('[BEFORE serverReconciliation]');
-        // console.log('this.serverState.step', this.serverState.step);
-        // console.log('this.logicState.step', this.logicState.step);
+        console.log('[BEFORE serverReconciliation]');
+        console.log('this.serverState.step', this.serverState.step);
+        console.log('this.logicState.step', this.logicState.step);
         this.serverReconciliation();
-        // console.log('[AFTER serverReconciliation]');
-        // console.log('this.serverState.step', this.serverState.step);
-        // console.log('this.logicState.step', this.logicState.step);
-
+        console.log('[AFTER serverReconciliation]');
+        console.log('this.serverState.step', this.serverState.step);
+        console.log('this.logicState.step', this.logicState.step);
+        console.log(this.logicState);
         this.logicState = this.getCopy(this.serverState);
     }
 
@@ -173,7 +175,7 @@ class ClientController {
         if (this.running) {
             let loops = 0;
             // console.log('Date.now()=', Date.now(), 'this.nextGameTick=', this.nextGameTick);
-            while (Date.now() > this.nextGameTick && loops < 30) {
+            while (Date.now() > this.nextGameTick && loops < 5) {
                 this.updatePhysics();
                 this.nextGameTick += PHYSICS_TICK_DURATION;
                 // console.log('this.nextGameTick=', this.nextGameTick);
@@ -214,6 +216,12 @@ class ClientController {
 
         this.physicsStateHistory.push(this.getCopy(this.logicState));
 
+        //calculate ups
+        this.upsTimestamps.push({
+            timestamp: Date.now()
+        });
+        this.upsTimestamps = this.upsTimestamps.filter(upsTimestamp => upsTimestamp.timestamp > Date.now() - 1000);
+        this.scene.setUPS(this.upsTimestamps.length);
     }
 
     updateRender(interpolation) {
@@ -243,10 +251,8 @@ class ClientController {
         this.fpsTimestamps.push({
             timestamp: Date.now()
         });
-        this.fpsTimestamps = this.fpsTimestamps.filter(fpsTimestamp => fpsTimestamp.timestamp >= Date.now() - 1000);
-        if (this.fpsTimestamps[0].timestamp < Date.now() - 1000) {
-            this.scene.setFPS(this.fpsTimestamps.length);
-        }
+        this.fpsTimestamps = this.fpsTimestamps.filter(fpsTimestamp => fpsTimestamp.timestamp > Date.now() - 1000);
+        this.scene.setFPS(this.fpsTimestamps.length);
     }
 
     interpolateEntities() {
@@ -336,11 +342,9 @@ class ClientController {
 
     applyInput(state) {
         let localPlayer = state.players.find(player => player.number === this.id);
-        if (this.pendingInputs.length > 0) {
-            localPlayer.pig.vy = PIG_SPEED;
-            console.log('[INPUT APPLIED] ->', this.logicState.step);
-            this.inputHistory.set(this.sequenceNumber, this.logicState.step);
-        }
+        localPlayer.pig.vy = PIG_SPEED;
+        //console.log('[INPUT APPLIED] ->', this.logicState.step);
+        this.inputHistory.set(this.sequenceNumber, this.logicState.step);
     }
 
     getCopy(object) {
@@ -407,7 +411,7 @@ class ClientController {
         this.discardProcessedInputs();
         this.checkUnprocessedInputs();
         let deltaStep = this.logicState.step - this.serverState.step;
-        this.serverState = this.simulateGame(this.serverState, deltaStep);
+        this.serverState = this.getCopy(this.simulateGame(this.serverState, deltaStep));
 
         // for (let i = 0; i < this.currentState.players.length; i++) {
         //         //     if (this.currentState.players[i].number !== this.id) {
@@ -435,12 +439,12 @@ class ClientController {
         let oldState = null;
         //check for unprocessed input from server
         for (let sequenceNumber of this.inputHistory.keys()) {
-            console.log('SEQUENCENUMBER', sequenceNumber);
             let oldStep = this.inputHistory.get(sequenceNumber);
+            console.log('Old step =', oldStep);
             let deltaStep = this.serverState.step - oldStep;
-
+            console.log('deltaStep =', deltaStep);
             oldState = this.getCopy(this.statesHistory.find(state => state.step === oldStep));
-            this.simulateGame(oldState, deltaStep);
+            oldState = this.getCopy(this.simulateGame(oldState, deltaStep));
             this.applyInput(oldState);
         }
         if (oldState) {
@@ -469,13 +473,15 @@ class ClientController {
 
 
     simulateGame(state, nbTicks) {
+        console.log('simulateGame(', nbTicks, ')');
         let simulatedState = this.getCopy(state);
+        let ticks = Math.abs(nbTicks);
         if (nbTicks > 0) {
-            for (let i = 0; i < nbTicks; i++) {
+            console.log(simulatedState);
+            for (let i = 0; i < ticks; i++) {
                 simulatedState = this.simulatePhysics(state, 1);
             }
         } else {
-            let ticks = Math.abs(nbTicks);
             for (let i = 0; i < ticks; i++) {
                 simulatedState = this.simulatePhysics(state, -1);
             }
