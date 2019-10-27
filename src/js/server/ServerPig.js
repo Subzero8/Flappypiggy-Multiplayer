@@ -18,20 +18,24 @@ class ServerPig {
         this.vy = PIG_SPEED;
     }
 
-    applyInput(){
+    applyInput() {
         this.vy = PIG_SPEED;
     }
 
     updatePig() {
-        this.y += this.vy;
-        if (this.y >= GAME_HEIGHT) {
-            this.y = GAME_HEIGHT
+        this.y += this.vy + GRAVITY / 2;
+        if (this.y + this.height >= GAME_HEIGHT) {
+            this.y = GAME_HEIGHT - this.height
         }
-        if ((this.vy + GRAVITY) <= PIG_MAX_SPEED){
+        if (this.y <= 0) {
+            this.y = 0;
+        }
+        if (this.vy + GRAVITY <= PIG_MAX_SPEED) {
             this.vy += GRAVITY;
         }
     }
-    copy(){
+
+    copy() {
         let copy = new ServerPig();
         copy.y = this.y;
         copy.vy = this.vy;

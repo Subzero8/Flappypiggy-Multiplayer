@@ -92,8 +92,8 @@ class ClientController {
 
             }
         });
-        // this.socket.on('won', () => this.scene.displayMessage(this.scene.annoncer, 'You Won !'));
-        // this.socket.on('lost', () => this.scene.displayMessage(this.scene.annoncer, 'You Lost !'));
+        this.socket.on('won', () => this.scene.displayMessage(this.scene.annoncer, 'You Won !'));
+        this.socket.on('lost', () => this.scene.displayMessage(this.scene.annoncer, 'You Lost !'));
         this.socket.on('disconnect', () => this.stopLoops());
     }
 
@@ -150,6 +150,7 @@ class ClientController {
                 //console.log(extrapolatedPosition);
             }
         });
+        console.log(this.statesHistory);
         console.log('[BEFORE serverReconciliation]');
         console.log('this.serverState.step', this.serverState.step);
         console.log('this.logicState.step', this.logicState.step);
@@ -343,7 +344,7 @@ class ClientController {
     applyInput(state) {
         let localPlayer = state.players.find(player => player.number === this.id);
         localPlayer.pig.vy = PIG_SPEED;
-        //console.log('[INPUT APPLIED] ->', this.logicState.step);
+        console.log('[INPUT APPLIED] ->', this.logicState.step);
     }
 
     getCopy(object) {
@@ -371,11 +372,16 @@ class ClientController {
         });
         simulatedState.players.forEach(player => {
             if (player.number === this.id) {
-                player.pig.y += player.pig.vy * step;
-                if (player.pig.y >= GAME_HEIGHT) {
-                    player.pig.y = GAME_HEIGHT
+                // console.log(player.pig.y);
+                // console.log(player.pig.vy);
+                player.pig.y += player.pig.vy * step + GRAVITY * step / 2;
+                if (player.pig.y + player.pig.height >= GAME_HEIGHT) {
+                    player.pig.y = GAME_HEIGHT - player.pig.height
                 }
-                if (player.pig.vy + GRAVITY <= PIG_MAX_SPEED) {
+                if (player.pig.y <= 0) {
+                    player.pig.y = 0;
+                }
+                if (player.pig.vy + GRAVITY * step <= PIG_MAX_SPEED) {
                     player.pig.vy += GRAVITY * step;
                 }
             }
@@ -408,6 +414,7 @@ class ClientController {
     serverReconciliation() {
         // console.log(this.currentState);
         // console.log(this.serverState);
+        console.log(this.inputHistory);
         this.discardProcessedInputs();
         this.checkUnprocessedInputs();
         let deltaStep = this.logicState.step - this.serverState.step;
@@ -451,6 +458,22 @@ class ClientController {
         console.log('this.serverState', this.serverState);
     }
 
+    simulateGame(state, nbTicks) {
+        console.log('simulateGame(', nbTicks, ')');
+        let simulatedState = this.getCopy(state);
+        console.log(simulatedState);
+        let ticks = Math.abs(nbTicks);
+        for (let i = 0; i < ticks; i++) {
+            if (nbTicks > 0) {
+                simulatedState = this.simulatePhysics(simulatedState, 1);
+            } else {
+                simulatedState = this.simulatePhysics(simulatedState, -1);
+            }
+        }
+        console.log(simulatedState);
+        return simulatedState;
+    }
+
 
     calculatePing() {
         this.pings = this.pings.filter(ping => ping.received > Date.now() - 500);
@@ -470,21 +493,4 @@ class ClientController {
     }
 
 
-    simulateGame(state, nbTicks) {
-        console.log('simulateGame(', nbTicks, ')');
-        let simulatedState = this.getCopy(state);
-        console.log(simulatedState);
-        let ticks = Math.abs(nbTicks);
-        if (nbTicks > 0) {
-            for (let i = 0; i < ticks; i++) {
-                simulatedState = this.simulatePhysics(state, 1);
-            }
-        } else {
-            for (let i = 0; i < ticks; i++) {
-                simulatedState = this.simulatePhysics(state, -1);
-            }
-        }
-        console.log(simulatedState);
-        return simulatedState;
-    }
 }

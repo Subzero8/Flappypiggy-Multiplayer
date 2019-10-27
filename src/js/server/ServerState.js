@@ -16,6 +16,27 @@ class ServerState {
         let step = this.step;
         return new ServerState(pipes, players, step);
     }
+
+    updatePhysics() {
+        this.updatePlayers();
+        this.updatePipes();
+        this.step++;
+        //this.checkCollision();
+    }
+
+    updatePlayers() {
+        this.players.forEach(player => player.pig.updatePig())
+    }
+
+    updatePipes() {
+        for (let i = this.pipes.length - 1; i >= 0; i--) {
+            let pipe = this.pipes[i];
+            pipe.update();
+            if (pipe.x + pipe.width < 0) {
+                this.pipes.shift();
+            }
+        }
+    }
 }
 
 module.exports = ServerState;

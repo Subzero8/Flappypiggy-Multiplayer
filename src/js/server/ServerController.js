@@ -47,7 +47,7 @@ class ServerController {
 
         this.lagUpdate = 0;
         this.previousUpdate = 0;
-        this.inputBuffer = new Map();
+        this.inputBuffer = [];
 
         this.initializeNetworking();
         this.sendNewMatchNotification();
@@ -63,8 +63,8 @@ class ServerController {
             socket.on('packet', packet => {
                 switch (packet.action) {
                     case "input":
-                        this.packets.push(packet);
                         console.log('[RECEIVED] ->', this.state.step);
+                        this.inputBuffer.push(packet);
                         break;
                     case "ready":
                         if (!this.countdownStarted) {
@@ -196,7 +196,7 @@ class ServerController {
         if (this.lagPhysics >= PHYSICS_TICK_DURATION) {
             if (this.running) {
                 this.handleInputs();
-                this.updatePhysics(this.state);
+                this.state.updatePhysics();
                 this.notifyObservers(delta);
                 this.stateHistory.set(this.state.step, this.state.copy());
             }
@@ -217,26 +217,27 @@ class ServerController {
     }
 
     handleInputs() {
-        this.packets.forEach(packet => {
+        this.inputBuffer.forEach(packet => {
+            console.log(this.inputBuffer);
             console.log('[INPUT APPLIED] ->', this.state.step);
             let deltaStep = this.state.step - packet.step;
-            console.log('[REWINDING] ->', deltaStep, 'steps');
 
-            let oldState = this.state.copy();
-            if (deltaStep > 0) {
+            if (deltaStep >= 0) {
+                console.log('[REWINDING] ->', deltaStep, 'steps');
+                let oldState = this.state.copy();
                 oldState = this.stateHistory.get(packet.step).copy();
-            }
-            let player = oldState.players.find(player => player.number === packet.id);
-            player.pig.applyInput();
+                let player = oldState.players.find(player => player.number === packet.id);
+                player.pig.applyInput();
 
-            for (let i = 0; i < deltaStep; i++) {
-                player.pig.updatePig();
+                for (let i = 0; i < deltaStep; i++) {
+                    player.pig.updatePig();
+                }
+                let updatedPlayer = this.state.players.find(player => player.number === packet.id);
+                updatedPlayer.pig = player.pig;
+                updatedPlayer.sequenceNumber = packet.sequenceNumber;
+                this.inputBuffer = this.inputBuffer.filter(p => p.step !== packet.step);
             }
-            let updatedPlayer = this.state.players.find(player => player.number === packet.id);
-            updatedPlayer.pig = player.pig;
-            updatedPlayer.sequenceNumber = packet.sequenceNumber;
         });
-        this.packets = [];
     }
 
     getPlayer(number) {
