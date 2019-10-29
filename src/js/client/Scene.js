@@ -83,7 +83,7 @@ class Scene {
             this.adjustPosition(pigSprite);
             this.adjustScale(pigSprite);
             if (pigSprite.number !== playerNumber) {
-                pigSprite.texture.alpha = 0.1;
+                pigSprite.alpha = 0.1;
             }
         })
     }

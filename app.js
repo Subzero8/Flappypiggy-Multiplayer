@@ -68,11 +68,6 @@ function startMatch(lobby) {
             console.log(lobby.sockets.length);
             let match = new ServerController(lobby.sockets);
             for (let i = 0; i < lobby.sockets.length; i++) {
-                lobby.sockets[i].emit('packet', {
-                    action: 'starting',
-                    count: count,
-                    playersCount: lobby.sockets.length
-                });
                 matches.set(lobby.sockets[i], match);
             }
             lobby.started = true;
@@ -93,7 +88,11 @@ function disconnectClient(socket) {
             clearInterval(lobby.countdown);
         }
     }
-    matches.get(socket).stopLoops();
+    let match = matches.get(socket);
+    if (match) {
+        match.stopLoops();
+    }
+
     clientLobbies.delete(socket);
 }
 

@@ -11,7 +11,7 @@ class PigSprite extends Container {
 
         let style = new PIXI.TextStyle({
             fontFamily: "Futura",
-            fontSize: 22.5,
+            fontSize: 20,
             fill: "white",
         });
         this.playerNumber = new PIXI.Text('PLAYER ' + (this.number + 1), style);
