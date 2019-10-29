@@ -66,10 +66,11 @@ class ClientController {
             switch (packet.action) {
                 case 'foundOpponent':
                     this.scene.displayMessage(this.scene.annoncer,
-                        +packet.nbPlayers + (packet.nbPlayers > 1 ? ' players' : ' player') + ' In Queue.');
+                        +packet.nbPlayers + (packet.nbPlayers > 1 ? ' players' : ' player') + ' In Lobby');
                     break;
                 case 'starting':
-                    this.scene.displayMessage(this.scene.annoncer, 'Match starting in ' + packet.count + ' (' + packet.playersCount + ' players)');
+                    this.scene.displayMessage(this.scene.annoncer, packet.playersCount + (packet.playersCount > 1 ? ' players' : ' player') + ' In Lobby' + '\n' +
+                        'Match starting in ' + packet.count);
                     break;
                 case "newGame":
                     this.onNewMatch(packet);
