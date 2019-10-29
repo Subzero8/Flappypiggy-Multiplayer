@@ -9,6 +9,8 @@ let connectedSockets = [];
 let lobbies = [];
 let newLobby;
 let clientLobbies = new Map();
+let matches = new Map();
+
 app.get('/', (req, res) => res.sendFile(__dirname + '/src/index.html'));
 
 app.use(express.static('src'));
@@ -65,6 +67,14 @@ function startMatch(lobby) {
         } else {
             console.log(lobby.sockets.length);
             let match = new ServerController(lobby.sockets);
+            for (let i = 0; i < lobby.sockets.length; i++) {
+                lobby.sockets[i].emit('packet', {
+                    action: 'starting',
+                    count: count,
+                    playersCount: lobby.sockets.length
+                });
+                matches.set(lobby.sockets[i], match);
+            }
             lobby.started = true;
             clearInterval(lobby.countdown);
         }
@@ -83,6 +93,7 @@ function disconnectClient(socket) {
             clearInterval(lobby.countdown);
         }
     }
+    matches.get(socket).stopLoops();
     clientLobbies.delete(socket);
 }
 

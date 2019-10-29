@@ -78,6 +78,8 @@ class ServerController {
                         break;
                     case "lost":
                         this.lostPlayers.push(player);
+                        console.log(this.lostPlayers.length);
+                        console.log(this.players.length);
                         if (this.lostPlayers.length === this.players.length - 1) {
                             this.endGame();
                             this.stopLoop();
