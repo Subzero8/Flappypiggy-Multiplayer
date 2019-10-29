@@ -24,9 +24,9 @@ class ServerPig {
 
     updatePig() {
         this.y += this.vy + GRAVITY / 2;
-        if (this.y + this.height >= GAME_HEIGHT) {
-            this.y = GAME_HEIGHT - this.height
-        }
+        // if (this.y + this.height >= GAME_HEIGHT) {
+        //     this.y = GAME_HEIGHT - this.height
+        // }
         if (this.y <= 0) {
             this.y = 0;
         }

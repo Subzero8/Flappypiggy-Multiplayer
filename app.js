@@ -90,7 +90,7 @@ function disconnectClient(socket) {
     }
     let match = matches.get(socket);
     if (match) {
-        match.stopLoops();
+        match.stopLoop();
     }
 
     clientLobbies.delete(socket);
