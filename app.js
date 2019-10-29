@@ -51,7 +51,7 @@ function connectionHandler(socket) {
 http.listen(port, () => console.log(`Example app listening on port ${port}!`));
 
 function startMatch(lobby) {
-    let count = 30;
+    let count = 5;
     lobby.countdown = setInterval(() => {
         console.log(count);
         if (count > 0) {
