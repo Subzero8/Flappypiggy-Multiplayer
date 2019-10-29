@@ -73,6 +73,6 @@ class State {
             width: 0.7 * player.pig.width,
             height: 0.7 * player.pig.height
         };
-        return pigHitbox.y + pigHitbox.height > GAME_HEIGHT
+        return pigHitbox.y + pigHitbox.height >= GAME_HEIGHT
     }
 }

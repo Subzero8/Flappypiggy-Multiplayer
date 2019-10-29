@@ -105,6 +105,7 @@ class Scene {
 
 
     initializeAnnoncer() {
+        console.log("initializeAnnoncer");
         let style = new PIXI.TextStyle({
             fontFamily: "Futura",
             fontSize: 50 * this.app.renderer.width / this.app.renderer.resolution / GAME_WIDTH,
@@ -113,7 +114,7 @@ class Scene {
         this.annoncer = new PIXI.Text("", style);
         this.annoncer.anchor.set(0.5, 0.5);
         this.annoncer.x = window.innerWidth / 2;
-        this.annoncer.y = window.innerHeight * 0.2;
+        this.annoncer.y = window.innerWidth * 9 / 16 * 0.2;
         this.app.stage.addChild(this.annoncer);
     }
 
