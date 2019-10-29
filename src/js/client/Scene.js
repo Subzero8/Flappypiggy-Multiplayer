@@ -12,7 +12,7 @@ class Scene {
         this.initializeUPSDisplay();
     }
 
-    updateScene(state) {
+    render(state) {
         this.updatePigs(state);
         this.updatePipes(state);
         this.deleteUnusedPipes(state);
@@ -83,7 +83,7 @@ class Scene {
             this.adjustPosition(pigSprite);
             this.adjustScale(pigSprite);
             if (pigSprite.number !== playerNumber) {
-                pigSprite.alpha = 0.2;
+                pigSprite.texture.alpha = 0.2;
             }
         })
     }

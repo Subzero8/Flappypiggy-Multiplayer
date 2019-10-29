@@ -53,7 +53,7 @@ class ServerController {
         this.sendNewMatchNotification();
 
         this.stateHistory = new Map();
-
+        this.lostPlayers = [];
         this.startLoop();
     }
 
@@ -76,9 +76,26 @@ class ServerController {
                             action: 'pong'
                         });
                         break;
+                    case "lost":
+                        this.lostPlayers.push(player);
+                        if (this.lostPlayers.length === this.players.length - 1) {
+                            this.endGame();
+                            this.stopLoop();
+                        }
+                        break;
                 }
             });
         });
+    }
+
+    endGame() {
+        for (let i = 0; i < this.players.length; i++) {
+            if (!this.lostPlayers.some(player => player.number === this.players[i].number)) {
+                this.getSocket(this.players[i].number).emit('packet', {
+                    action: 'won'
+                })
+            }
+        }
     }
 
     getSocket(number) {
@@ -209,13 +226,6 @@ class ServerController {
         this.observers.push(observer);
     }
 
-    updatePhysics(state) {
-        this.updatePlayers(state);
-        this.updatePipes(state);
-        state.step++;
-        //this.checkCollision();
-    }
-
     handleInputs() {
         this.inputBuffer.forEach(packet => {
             console.log(this.inputBuffer);
@@ -224,8 +234,7 @@ class ServerController {
 
             if (deltaStep >= 0) {
                 console.log('[REWINDING] ->', deltaStep, 'steps');
-                let oldState = this.state.copy();
-                oldState = this.stateHistory.get(packet.step).copy();
+                let oldState = this.stateHistory.get(packet.step).copy();
                 let player = oldState.players.find(player => player.number === packet.id);
                 player.pig.applyInput();
 
@@ -247,84 +256,6 @@ class ServerController {
     stopLoop() {
         this.loopRunning = false;
     }
-
-    //updates pig positions
-    updatePlayers(state) {
-        state.players.forEach(player => player.pig.updatePig())
-    }
-
-    checkCollision() {
-        let loser;
-        this.players.forEach(player => {
-            if (this.pigOutOfBounds(player) || this.checkCollisionPipes(player)) {
-                loser = player;
-            }
-        });
-        if (loser) {
-            console.log('game over');
-            loser.socket.emit('lost');
-            this.player.socket.find(player => player.socket.id !== loser.socket.id).emit('won');
-            gameloop.clearGameLoop(this.loop);
-        }
-    }
-
-    checkCollisionPipes(player) {
-        for (let i = 0; i < this.pipes.length; i++) {
-            if (this.checkCollisionPipe(player.pig, this.pipes[i])) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    checkCollisionPipe(pig, pipe) {
-        let pigHitbox = {
-            x: pig.x + 0.3 * pig.width / 2,
-            y: pig.y + 0.3 * pig.height / 2,
-            width: 0.7 * pig.width,
-            height: 0.7 * pig.height
-        };
-        return this.rectanglesIntersects(pigHitbox, pipe)
-    }
-
-    rectanglesIntersects(pigHitbox, pipe) {
-        //top
-        if (pigHitbox.x + pigHitbox.width > pipe.x &&
-            pigHitbox.x < pipe.x + pipe.width &&
-            pigHitbox.y + pigHitbox.height > pipe.topY &&
-            pigHitbox.y < pipe.topY + pipe.height) {
-            return true;
-        }
-        //bottom
-        if (pigHitbox.x + pigHitbox.width > pipe.x &&
-            pigHitbox.x < pipe.x + pipe.width &&
-            pigHitbox.y + pigHitbox.height > pipe.bottomY &&
-            pigHitbox.y < pipe.bottomY + pipe.height) {
-            return true;
-        }
-    }
-
-    pigOutOfBounds(player) {
-        let pigHitbox = {
-            x: player.pig.x + 0.3 * player.pig.width / 2,
-            y: player.pig.y + 0.3 * player.pig.height / 2,
-            width: 0.7 * player.pig.width,
-            height: 0.7 * player.pig.height
-        };
-        return pigHitbox.y + pigHitbox.height > GAME_HEIGHT
-    }
-
-
-    updatePipes(state) {
-        for (let i = state.pipes.length - 1; i >= 0; i--) {
-            let pipe = state.pipes[i];
-            pipe.update();
-            if (pipe.x + pipe.width < 0) {
-                state.pipes.shift();
-            }
-        }
-    }
-
 }
 
 module.exports = ServerController;
