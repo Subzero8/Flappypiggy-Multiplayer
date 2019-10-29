@@ -31,5 +31,4 @@ loader.onComplete.add(() => {
     let socket = io();
     let scene = new Scene(app);
     let match = new ClientController(scene, socket);
-
 });

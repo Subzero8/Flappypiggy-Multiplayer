@@ -51,6 +51,7 @@ class ClientController {
 
         this.debugging = false;
 
+        this.scene.displayMessage(this.scene.annoncer, 'Looking for opponents...');
     }
 
     sendPing() {
@@ -63,6 +64,13 @@ class ClientController {
     initializeNetworking() {
         this.socket.on('packet', packet => {
             switch (packet.action) {
+                case 'foundOpponent':
+                    this.scene.displayMessage(this.scene.annoncer,
+                        +packet.nbPlayers + (packet.nbPlayers > 1 ? ' players' : ' player') + ' In Queue.');
+                    break;
+                case 'starting':
+                    this.scene.displayMessage(this.scene.annoncer, 'Match starting in ' + packet.count + ' (' + packet.playersCount + ' players)');
+                    break;
                 case "newGame":
                     this.onNewMatch(packet);
                     break;
@@ -124,7 +132,7 @@ class ClientController {
         this.onServerUpdate(packet);
         //initialize Scene
         this.scene.initialize(this.logicState, this.id);
-        this.scene.displayMessage(this.scene.annoncer, 'Match Found !');
+        this.scene.displayMessage(this.scene.annoncer, 'Press a key to start the game !');
         this.setListeners();
         this.startLoop();
 
