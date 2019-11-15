@@ -285,7 +285,7 @@ class ClientController {
     }
 
     interpolatePigs() {
-        console.log(this.logicState.step);
+        //console.log(this.logicState.step);
         let render_step = this.renderingState.step - (PHYSICS_TICKRATE / CLIENT_TICKRATE) * 2;
         //console.log(this.renderingState.step);
         this.renderingState.players.forEach(player => {
@@ -301,7 +301,7 @@ class ClientController {
 
                 // Interpolate between the two surrounding authoritative positions.
                 for (let i = 0; i < positionHistory.length; i++) {
-                    console.log(positionHistory[i]);
+                    //console.log(positionHistory[i]);
                 }
                 if (positionHistory.length >= 2 && positionHistoryA.step <= render_step && render_step <= positionHistoryB.step) {
                     let y0 = positionHistoryA.position;
