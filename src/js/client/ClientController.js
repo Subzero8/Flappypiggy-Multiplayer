@@ -140,7 +140,7 @@ class ClientController {
     }
 
     onServerUpdate(packet) {
-        console.log('[SERVER UPDATE]');
+        //console.log('[SERVER UPDATE]');
         this.serverState = new State(packet.state);
         this.serverState.players.forEach(player => {
             if (player.number !== this.id) {
@@ -434,11 +434,11 @@ class ClientController {
         //check for unprocessed input from server
         //console.log('this.serverState', this.serverState);
         for (let sequenceNumber of this.inputHistory.keys()) {
-            console.log('sequenceNumber=', sequenceNumber);
+            //console.log('sequenceNumber=', sequenceNumber);
             let oldStep = this.inputHistory.get(sequenceNumber);
-            console.log('Old step =', oldStep);
+            //console.log('Old step =', oldStep);
             let deltaStep = oldStep - this.serverState.step;
-            console.log('deltaStep =', deltaStep);
+            //console.log('deltaStep =', deltaStep);
             this.serverState.updatePhysics(deltaStep);
             this.applyInput(this.serverState);
 
