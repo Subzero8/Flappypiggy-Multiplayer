@@ -188,7 +188,7 @@ class ClientController {
             // console.log('Date.now()=', Date.now(), 'this.nextGameTick=', this.nextGameTick);
             while (Date.now() > this.nextGameTick && loops < 5) {
                 this.updatePhysics();
-                this.checkCollision();
+                //this.checkCollision();
                 this.nextGameTick += PHYSICS_TICK_DURATION;
                 // console.log('this.nextGameTick=', this.nextGameTick);
                 loops++;

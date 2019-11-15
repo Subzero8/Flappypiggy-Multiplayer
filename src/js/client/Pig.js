@@ -15,9 +15,9 @@ class Pig {
 
     update(step) {
         this.y += this.vy * step + (GRAVITY * step * step) / 2;
-        // if (this.y + this.height >= GAME_HEIGHT) {
-        //     this.y = GAME_HEIGHT - this.height;
-        // }
+        if (this.y + this.height >= GAME_HEIGHT) {
+            this.y = GAME_HEIGHT - this.height;
+        }
         if (this.y <= 0) {
             this.y = 0;
         }
